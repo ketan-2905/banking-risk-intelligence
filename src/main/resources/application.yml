@@ -1,0 +1,117 @@
+spring:
+  application:
+    name: banking-risk-intelligence
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/banking_risk
+    username: ${DB_USER:banking}
+    password: ${DB_PASSWORD:banking_local_only}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+    show-sql: false
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+
+  security:
+    user:
+      name: admin
+      password: changeme
+
+async:
+  executor:
+    core-pool-size: 4
+    max-pool-size: 16
+    queue-capacity: 500
+    thread-name-prefix: risk-async-
+
+ai:
+  ollama:
+    base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+    model: ${OLLAMA_MODEL:llama3}
+    enabled: ${AI_ENABLED:false}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-local-jwt-secret-do-not-use-in-production-abcdefgh}
+    expiry-ms: ${JWT_EXPIRY_MS:3600000}
+  transfer:
+    rate-limit:
+      requests-per-minute: ${RATE_LIMIT_RPM:20}
+    idempotency:
+      lock-ttl-seconds: ${IDEM_LOCK_TTL_SECONDS:30}
+      lock-wait-ms: ${IDEM_LOCK_WAIT_MS:200}
+      response-ttl-seconds: ${IDEM_RESPONSE_TTL_SECONDS:86400}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: banking-risk-intelligence
+
+logging:
+  level:
+    com.example.bankingrisk: INFO
+    org.flywaydb: INFO
+    org.hibernate.SQL: WARN
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed
+
+logging:
+  level:
+    com.example.bankingrisk: DEBUG
+
+ai:
+  ollama:
+    enabled: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+app:
+  transfer:
+    rate-limit:
+      requests-per-minute: 10000
+    idempotency:
+      lock-wait-ms: 50

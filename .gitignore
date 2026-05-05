@@ -1,0 +1,25 @@
+# ── Build output ──────────────────────────────────────────────────────────
+target/
+*.class
+*.jar
+
+# ── IDE ───────────────────────────────────────────────────────────────────
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+
+# ── OS ────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.stackdump
+
+# ── Logs ──────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Dev planning notes ────────────────────────────────────────────────────
+# Internal design docs and implementation notes — not relevant to code review
+.dev-notes/
