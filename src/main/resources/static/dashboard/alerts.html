@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyst Dashboard — Risk Alerts</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; background: #f8f9fa; }
+        h1 { color: #343a40; }
+        .filters { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        select, button { padding: 0.4rem 0.8rem; border: 1px solid #ced4da; border-radius: 4px; }
+        button { background: #0d6efd; color: white; border-color: #0d6efd; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+        th, td { text-align: left; padding: 0.6rem 0.8rem; border-bottom: 1px solid #dee2e6; }
+        th { background: #e9ecef; font-weight: 600; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.78rem; font-weight: 600; }
+        .HIGH { background: #f8d7da; color: #842029; }
+        .MEDIUM { background: #fff3cd; color: #664d03; }
+        .LOW { background: #d1e7dd; color: #0f5132; }
+        .REVIEW_PENDING { background: #cfe2ff; color: #0a58ca; }
+        .priority-flag { color: #dc3545; font-weight: bold; }
+        #error { color: red; margin-bottom: 1rem; }
+        .action-btn { padding: 2px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; margin-right: 4px; }
+        .approve-btn { background: #198754; color: white; border: none; }
+        .reject-btn  { background: #dc3545; color: white; border: none; }
+    </style>
+</head>
+<body>
+    <h1>Risk Alert Dashboard</h1>
+    <div class="filters">
+        <select id="statusFilter">
+            <option value="">All statuses</option>
+            <option value="REVIEW_PENDING">REVIEW_PENDING</option>
+            <option value="AI_PENDING">AI_PENDING</option>
+            <option value="AI_COMPLETE">AI_COMPLETE</option>
+            <option value="APPROVED">APPROVED</option>
+            <option value="REJECTED">REJECTED</option>
+            <option value="LOW_NO_AI">LOW_NO_AI</option>
+        </select>
+        <select id="riskLevelFilter">
+            <option value="">All risk levels</option>
+            <option value="HIGH">HIGH</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="LOW">LOW</option>
+        </select>
+        <select id="limitFilter">
+            <option value="25">25</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+        </select>
+        <button onclick="loadAlerts()">Refresh</button>
+    </div>
+    <div id="error"></div>
+    <table id="alertsTable">
+        <thead>
+            <tr>
+                <th>Alert ID</th>
+                <th>Risk</th>
+                <th>Score</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Narrative (masked)</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="alertsBody">
+            <tr><td colspan="8" style="color:#6c757d">Loading…</td></tr>
+        </tbody>
+    </table>
+
+    <script>
+        async function loadAlerts() {
+            document.getElementById('error').textContent = '';
+            const status    = document.getElementById('statusFilter').value;
+            const riskLevel = document.getElementById('riskLevelFilter').value;
+            const limit     = document.getElementById('limitFilter').value;
+            const params    = new URLSearchParams();
+            if (status)    params.set('status', status);
+            if (riskLevel) params.set('riskLevel', riskLevel);
+            params.set('limit', limit);
+
+            try {
+                const resp = await fetch('/api/analyst/alerts?' + params.toString());
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const alerts = await resp.json();
+                renderAlerts(alerts);
+            } catch (e) {
+                document.getElementById('error').textContent = 'Failed to load alerts: ' + e.message;
+                document.getElementById('alertsBody').innerHTML =
+                    '<tr><td colspan="8">Error loading data.</td></tr>';
+            }
+        }
+
+        function renderAlerts(alerts) {
+            const tbody = document.getElementById('alertsBody');
+            if (!alerts.length) {
+                tbody.innerHTML = '<tr><td colspan="8" style="color:#6c757d">No alerts found.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = alerts.map(a => `
+                <tr>
+                    <td style="font-size:0.8rem;font-family:monospace">${a.alertId}</td>
+                    <td><span class="badge ${a.riskLevel}">${a.riskLevel}</span></td>
+                    <td>${a.riskScore}</td>
+                    <td><span class="badge ${a.status}">${a.status}</span></td>
+                    <td>${a.priority ? '<span class="priority-flag">&#9888; HIGH</span>' : ''}</td>
+                    <td style="font-size:0.8rem;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                        title="${escHtml(a.maskedNarrative || '')}">
+                        ${escHtml(a.maskedNarrative || '—')}
+                    </td>
+                    <td style="font-size:0.8rem">${new Date(a.createdAt).toLocaleString()}</td>
+                    <td>
+                        ${a.status === 'REVIEW_PENDING' ? `
+                            <button class="action-btn approve-btn" onclick="review('${a.alertId}','approve')">Approve</button>
+                            <button class="action-btn reject-btn"  onclick="review('${a.alertId}','reject')">Reject</button>
+                        ` : ''}
+                    </td>
+                </tr>`).join('');
+        }
+
+        async function review(alertId, action) {
+            const reason = prompt(`Reason for ${action}:`);
+            if (!reason || !reason.trim()) return;
+            try {
+                const resp = await fetch(`/api/analyst/alerts/${alertId}/${action}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: reason.trim() })
+                });
+                if (!resp.ok) {
+                    const body = await resp.json().catch(() => ({}));
+                    alert('Error: ' + (body.message || resp.status));
+                } else {
+                    loadAlerts();
+                }
+            } catch (e) {
+                alert('Request failed: ' + e.message);
+            }
+        }
+
+        function escHtml(s) {
+            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        loadAlerts();
+    </script>
+</body>
+</html>
