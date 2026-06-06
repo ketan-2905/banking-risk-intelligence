@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="banking-risk-intelligence"/>
+
+    <!-- Structured key=value pattern. Does NOT log: account numbers, emails, phone numbers, raw AI prompts, token maps -->
+    <property name="STRUCTURED_PATTERN"
+              value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ} level=%level app=${appName} logger=%logger{30} thread=%thread %X{transfer_id:+transfer_id=%X{transfer_id} }%X{alert_id:+alert_id=%X{alert_id} }%X{risk_level:+risk_level=%X{risk_level} }%X{event_phase:+event_phase=%X{event_phase} }msg=%replace(%message){'[\r\n]',' '}%n%rootException"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${STRUCTURED_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+    <logger name="com.example.bankingrisk" level="INFO"/>
+    <logger name="org.flywaydb" level="INFO"/>
+    <logger name="org.hibernate.SQL" level="WARN"/>
+    <logger name="org.springframework.security" level="WARN"/>
+
+    <!-- Test profile: quieter output to keep Surefire reports readable -->
+    <springProfile name="test">
+        <root level="WARN">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+        <logger name="com.example.bankingrisk" level="WARN"/>
+    </springProfile>
+</configuration>
