@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5433/banking_risk
+    username: banking
+    password: banking_local_only
+    driver-class-name: org.postgresql.Driver
+
+  flyway:
+    url: jdbc:postgresql://127.0.0.1:5433/banking_risk
+    user: banking
+    password: banking_local_only
+
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
