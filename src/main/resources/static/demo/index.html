@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Banking Risk Intelligence — Local Interview Demo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f1f5f9;
+      color: #1e293b;
+      line-height: 1.55;
+    }
+
+    .banner {
+      background: #991b1b;
+      color: #fff;
+      text-align: center;
+      padding: 9px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+    }
+
+    header {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 20px 32px 18px;
+    }
+    header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 4px; }
+    header .sub { font-size: 12px; color: #94a3b8; line-height: 1.6; }
+
+    main {
+      max-width: 980px;
+      margin: 24px auto;
+      padding: 0 16px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    @media (max-width: 680px) { .two-col { grid-template-columns: 1fr; } }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 18px 20px 20px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #64748b;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #0f172a;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .note {
+      font-size: 12px;
+      color: #475569;
+      background: #f8fafc;
+      border-left: 3px solid #cbd5e1;
+      padding: 8px 12px;
+      border-radius: 0 5px 5px 0;
+      margin-bottom: 12px;
+      line-height: 1.6;
+    }
+    .note strong { color: #1e293b; }
+    .note.warn { border-left-color: #f59e0b; background: #fffbeb; }
+    .note.danger { border-left-color: #dc2626; background: #fef2f2; }
+    .note.ok { border-left-color: #16a34a; background: #f0fdf4; }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 7px 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+      white-space: nowrap;
+    }
+    button:hover { opacity: .85; }
+    button:active { transform: scale(.97); }
+    button:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+
+    .btn-slate  { background: #334155; color: #fff; }
+    .btn-blue   { background: #1d4ed8; color: #fff; }
+    .btn-green  { background: #15803d; color: #fff; }
+    .btn-amber  { background: #b45309; color: #fff; }
+    .btn-red    { background: #b91c1c; color: #fff; }
+    .btn-ghost  { background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; }
+    .btn-indigo { background: #4338ca; color: #fff; }
+
+    .output {
+      background: #0f172a;
+      color: #cbd5e1;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Courier New', monospace;
+      font-size: 11.5px;
+      line-height: 1.6;
+      padding: 11px 13px;
+      border-radius: 7px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 280px;
+      overflow-y: auto;
+      margin-top: 10px;
+    }
+    .output.placeholder { color: #475569; font-style: italic; }
+    .output.err  { color: #fca5a5; }
+    .output.ok   { color: #86efac; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .3px;
+    }
+    .bg-low    { background: #dcfce7; color: #15803d; }
+    .bg-med    { background: #fef9c3; color: #854d0e; }
+    .bg-high   { background: #fee2e2; color: #991b1b; }
+    .bg-posted { background: #dbeafe; color: #1e40af; }
+    .bg-pend   { background: #fce7f3; color: #9d174d; }
+    .bg-score  { background: #f1f5f9; color: #334155; }
+    .bg-gray   { background: #f1f5f9; color: #475569; }
+
+    .token-rows { margin-bottom: 10px; }
+    .tok {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #64748b;
+      padding: 3px 0;
+    }
+    .tok .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #cbd5e1;
+      flex-shrink: 0;
+    }
+    .tok.loaded .dot { background: #16a34a; }
+    .tok.loaded { color: #15803d; }
+
+    .ctx-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      margin-left: auto;
+    }
+    .ctx-indicator .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #cbd5e1;
+    }
+    .ctx-indicator.ok .dot  { background: #16a34a; }
+    .ctx-indicator.err .dot { background: #dc2626; }
+    .ctx-indicator.ok  { color: #15803d; }
+    .ctx-indicator.err { color: #dc2626; }
+
+    .validation-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 3px 10px;
+      font-size: 11.5px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      margin-bottom: 10px;
+    }
+    .v-key  { color: #64748b; }
+    .v-true { color: #16a34a; font-weight: 700; }
+    .v-false { color: #dc2626; font-weight: 700; }
+
+    .result-badges { min-height: 22px; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .alert-list { margin-top: 10px; }
+    .alert-item {
+      border: 1px solid #e2e8f0;
+      border-radius: 7px;
+      padding: 10px 12px;
+      margin-bottom: 7px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+    .alert-item:hover { border-color: #94a3b8; }
+    .alert-item.selected { border-color: #1d4ed8; background: #eff6ff; }
+    .alert-item .alert-header {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 5px;
+    }
+    .alert-item .meta {
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 10.5px;
+      color: #64748b;
+      line-height: 1.7;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px 16px;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+<div class="banner">LOCAL DEMO ONLY — Active only with Spring local profile. Not for production.</div>
+
+<header>
+  <h1>Banking Risk Intelligence — Local Interview Demo</h1>
+  <div class="sub">Ledger-safe transfer API with deterministic risk scoring, escrow, analyst review, Redis idempotency, PostgreSQL, and protected observability.</div>
+</header>
+
+<main>
+
+  <!-- ── Row 1: Health + Demo Context ─────────────────────────────────── -->
+  <div class="two-col">
+
+    <!-- Step 1 -->
+    <div class="card">
+      <div class="card-title"><span class="step-num">1</span>System Readiness</div>
+      <div class="note">First confirm the Spring Boot backend is live.</div>
+      <div class="btn-row">
+        <button class="btn-blue" onclick="checkHealth()">Check health</button>
+      </div>
+      <div id="health-out" class="output placeholder">Click "Check health" → GET /actuator/health (public, no token needed)</div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="card">
+      <div class="card-title">
+        <span class="step-num">2</span>Demo Context
+        <span class="ctx-indicator" id="ctx-indicator"><span class="dot"></span></span>
+      </div>
+      <div class="note">
+        Loads the actual seeded local account IDs from the backend and validates that every account
+        exists in the database with the correct owner. Transfer buttons are disabled until this passes.
+      </div>
+      <div class="btn-row">
+        <button class="btn-blue" onclick="loadDemoContext()">Load demo context</button>
+      </div>
+      <div id="validation-grid" style="display:none;" class="validation-grid"></div>
+      <div id="ctx-out" class="output placeholder">Click "Load demo context" → GET /dev/demo-context</div>
+    </div>
+
+  </div>
+
+  <!-- ── Step 3: Tokens ─────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title"><span class="step-num">3</span>Demo Tokens</div>
+    <div class="note">
+      These JWTs are generated only in local profile through <code>/dev/token</code>.
+      Stored in browser <code>localStorage</code>. Expire in 1 hour. Get all three before running transfers.
+    </div>
+    <div class="token-rows">
+      <div class="tok" id="tok-customer1"><span class="dot"></span><span>customer1 — not loaded</span></div>
+      <div class="tok" id="tok-customer2"><span class="dot"></span><span>customer2 — not loaded</span></div>
+      <div class="tok" id="tok-analyst"><span class="dot"></span><span>analyst — not loaded</span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-slate" onclick="fetchToken('customer1')">Get customer1 token</button>
+      <button class="btn-slate" onclick="fetchToken('customer2')">Get customer2 token</button>
+      <button class="btn-slate" onclick="fetchToken('analyst')">Get analyst token</button>
+      <button class="btn-ghost"  onclick="clearTokens()">Clear tokens</button>
+    </div>
+    <div id="token-out" class="output placeholder">Token JSON appears here</div>
+  </div>
+
+  <!-- ── Step 4: Transfers ──────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title"><span class="step-num">4</span>Transfer Scenarios</div>
+    <div class="note">
+      <strong>Run in order: LOW → MEDIUM → HIGH.</strong><br>
+      <strong>LOW</strong> → small transfer to known beneficiary. ACCOUNT_AGE_UNDER_7_DAYS (+20) → score 20 → LOW → POSTED immediately.<br>
+      <strong>MEDIUM</strong> → new beneficiary + login anomaly. NEW_BENEFICIARY (+25) + ACCOUNT_AGE_UNDER_7_DAYS (+20) + LOGIN_ANOMALY (+16) → score 61 → MEDIUM → POSTED.<br>
+      <strong>HIGH</strong> → run MEDIUM first to establish $40 hourly velocity, then HIGH adds $5,100 → total $5,140 &gt; $5,000 threshold. All MEDIUM signals + HOURLY_VELOCITY_OVER_5000 (+30) → score 91 → HIGH → escrow → PENDING_REVIEW.
+    </div>
+    <div id="xfer-accounts-note" class="note warn">
+      Demo context not loaded. Complete Step 2 first.
+    </div>
+    <div class="btn-row">
+      <button class="btn-green" id="btn-low"    onclick="runTransfer('low')"    disabled>Run LOW-risk transfer</button>
+      <button class="btn-amber" id="btn-medium" onclick="runTransfer('medium')" disabled>Run MEDIUM-risk transfer</button>
+      <button class="btn-red"   id="btn-high"   onclick="runTransfer('high')"   disabled>Run HIGH-risk transfer</button>
+    </div>
+    <div class="result-badges" id="xfer-badges"></div>
+    <div id="xfer-rule-hint" style="font-size:11px;color:#64748b;margin-bottom:4px;"></div>
+    <div id="xfer-out" class="output placeholder">Transfer debug output and response appear here.</div>
+  </div>
+
+  <!-- ── Step 5: Analyst Review ─────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title"><span class="step-num">5</span>Analyst Review</div>
+    <div class="note">
+      <strong>High-risk transfers do not move funds immediately.</strong> They wait for analyst review.
+      Requires analyst token.<br>
+      <strong>Approve</strong> → held funds settle to destination account.<br>
+      <strong>Reject</strong> → held funds are released back to source account.<br>
+      Click an alert card to select it, then approve or reject.
+    </div>
+    <div class="btn-row">
+      <button class="btn-blue"  onclick="listAlerts()">List pending alerts</button>
+      <button class="btn-green" onclick="reviewAlert('approve')">Approve selected alert</button>
+      <button class="btn-red"   onclick="reviewAlert('reject')">Reject selected alert</button>
+    </div>
+    <div class="alert-list" id="alert-list"></div>
+    <div id="analyst-out" class="output placeholder">Analyst response appears here.
+
+Alert cards show:
+  alertId, transferId, riskScore, riskLevel, status, triggered rules, AI narrative (if present)
+
+If no alerts: run the HIGH-risk transfer first.</div>
+  </div>
+
+  <!-- ── Step 6: Observability ──────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title"><span class="step-num">6</span>Observability</div>
+    <div class="note">
+      <strong>Health is public.</strong> Metrics and Prometheus are protected and require an analyst JWT.
+      Get analyst token in Step 3 first.<br>
+      Opening <code>/actuator/metrics</code> or <code>/actuator/prometheus</code> directly in the browser
+      without a token returns <code>{"code":"UNAUTHORIZED"}</code> — this is expected security behavior, not a bug.
+    </div>
+    <div class="btn-row">
+      <button class="btn-blue"   onclick="checkHealth()">Check health</button>
+      <button class="btn-indigo" onclick="fetchMetric('/actuator/metrics',                           'Metrics list')">Load metrics list</button>
+      <button class="btn-indigo" onclick="fetchMetric('/actuator/metrics/transfer.creation.latency', 'Transfer creation latency')">Load transfer creation latency</button>
+      <button class="btn-indigo" onclick="fetchMetric('/actuator/metrics/risk.level.count',          'Risk level count')">Load risk level count</button>
+      <button class="btn-indigo" onclick="fetchMetric('/actuator/metrics/risk.score.histogram',      'Risk score histogram')">Load risk score histogram</button>
+      <button class="btn-indigo" onclick="fetchMetric('/actuator/prometheus',                        'Prometheus output')">Load Prometheus output</button>
+    </div>
+    <div id="obs-out" class="output placeholder">Metric output appears here. All buttons except "Check health" require analyst token.</div>
+  </div>
+
+</main>
+
+<footer>Banking Risk Intelligence &middot; Local Demo Only &middot; Spring Boot 3 + PostgreSQL + Redis</footer>
+
+<script>
+'use strict';
+
+// ─── Demo context ─────────────────────────────────────────────────────────
+let demoCtx = null;
+let ctxValid = false;
+
+async function loadDemoContext() {
+  setOut('ctx-out', 'GET /dev/demo-context\n\nLoading and validating…');
+  document.getElementById('validation-grid').style.display = 'none';
+
+  try {
+    const res = await fetch('/dev/demo-context');
+    const data = await res.json();
+
+    // Show validation grid
+    if (data.validation) {
+      const grid = document.getElementById('validation-grid');
+      grid.style.display = 'grid';
+      grid.innerHTML = '';
+      for (const [key, val] of Object.entries(data.validation)) {
+        const kEl = document.createElement('span');
+        kEl.className = 'v-key';
+        kEl.textContent = key;
+        const vEl = document.createElement('span');
+        vEl.className = val ? 'v-true' : 'v-false';
+        vEl.textContent = val ? '✓  true' : '✗  false';
+        grid.appendChild(kEl);
+        grid.appendChild(vEl);
+      }
+    }
+
+    if (!res.ok) {
+      // HTTP 500 from endpoint — validation failed
+      ctxValid = false;
+      demoCtx = null;
+      setCtxIndicator('err');
+      disableTransferButtons(true);
+      updateAccountsNote(false, data.error || 'Validation failed — check seeder logs.');
+      setOut('ctx-out', 'HTTP ' + res.status + ' — Demo context invalid\n\n' + JSON.stringify(data, null, 2), 'err');
+      return;
+    }
+
+    demoCtx = data;
+    ctxValid = true;
+    setCtxIndicator('ok');
+    disableTransferButtons(false);
+
+    const r = data.recommended;
+    updateAccountsNote(true,
+      'customer1 source:    ' + r.customer1SourceAccountId + '\n' +
+      'customer2 source:    ' + r.customer2SourceAccountId + '\n' +
+      'known beneficiary:   ' + r.knownBeneficiaryDestinationAccountId + '  (customer1 → this account is already trusted)\n' +
+      'new beneficiary:     ' + r.newBeneficiaryDestinationAccountId + '  (customer2 → NEW, triggers NEW_BENEFICIARY rule)'
+    );
+
+    setOut('ctx-out', 'HTTP 200 — All validation checks passed\n\n' + JSON.stringify(data, null, 2), 'ok');
+  } catch (e) {
+    ctxValid = false;
+    demoCtx = null;
+    setCtxIndicator('err');
+    disableTransferButtons(true);
+    setOut('ctx-out', 'ERROR: ' + e.message + '\n\nIs the Spring app running on port 8080?', 'err');
+  }
+}
+
+function setCtxIndicator(state) {
+  const el = document.getElementById('ctx-indicator');
+  el.className = 'ctx-indicator ' + state;
+  el.querySelector('.dot'); // just ensure dot exists
+}
+
+function disableTransferButtons(disabled) {
+  ['btn-low', 'btn-medium', 'btn-high'].forEach(id => {
+    document.getElementById(id).disabled = disabled;
+  });
+}
+
+function updateAccountsNote(valid, msg) {
+  const el = document.getElementById('xfer-accounts-note');
+  el.className = 'note ' + (valid ? 'ok' : 'danger');
+  el.style.whiteSpace = 'pre-wrap';
+  el.style.fontFamily = "'Cascadia Code','Fira Code',monospace";
+  el.style.fontSize = '11.5px';
+  el.textContent = msg;
+}
+
+function buildTransferDefs() {
+  const r = demoCtx.recommended;
+  return {
+    low: {
+      label:   'LOW',
+      hint:    'Expected: ACCOUNT_AGE_UNDER_7_DAYS (+20) → score 20 → LOW → POSTED',
+      user:    'customer1',
+      body:    {
+        sourceAccountId:      r.customer1SourceAccountId,
+        destinationAccountId: r.knownBeneficiaryDestinationAccountId,
+        amountMinor:          500,
+        currency:             'USD'
+      }
+    },
+    medium: {
+      label:   'MEDIUM',
+      hint:    'Expected: NEW_BENEFICIARY (+25) + ACCOUNT_AGE_UNDER_7_DAYS (+20) + LOGIN_ANOMALY (+16) → score 61 → MEDIUM → POSTED',
+      user:    'customer2',
+      body:    {
+        sourceAccountId:      r.customer2SourceAccountId,
+        destinationAccountId: r.newBeneficiaryDestinationAccountId,
+        amountMinor:          4000,
+        currency:             'USD'
+      }
+    },
+    high: {
+      label:   'HIGH',
+      hint:    'Expected: NEW_BENEFICIARY (+25) + ACCOUNT_AGE_UNDER_7_DAYS (+20) + LOGIN_ANOMALY (+16) + HOURLY_VELOCITY_OVER_5000 (+30) → score 91 → HIGH → PENDING_REVIEW',
+      user:    'customer2',
+      body:    {
+        sourceAccountId:      r.customer2SourceAccountId,
+        destinationAccountId: r.newBeneficiaryDestinationAccountId,
+        amountMinor:          510000,
+        currency:             'USD'
+      }
+    }
+  };
+}
+
+// ─── Token helpers ────────────────────────────────────────────────────────
+const tokKey = user => 'bri_demo_tok_' + user;
+function getToken(user) { return localStorage.getItem(tokKey(user)); }
+function saveToken(user, v) { localStorage.setItem(tokKey(user), v); }
+
+function clearTokens() {
+  ['customer1', 'customer2', 'analyst'].forEach(u => localStorage.removeItem(tokKey(u)));
+  updateTokenStatus();
+  setOut('token-out', '— tokens cleared —', 'placeholder');
+}
+
+function updateTokenStatus() {
+  [['customer1','tok-customer1'],['customer2','tok-customer2'],['analyst','tok-analyst']].forEach(([u, id]) => {
+    const el   = document.getElementById(id);
+    const tok  = getToken(u);
+    const span = el.querySelector('span:last-child');
+    if (tok) {
+      el.className = 'tok loaded';
+      span.textContent = u + ' — loaded ✓  (…' + tok.slice(-10) + ')';
+    } else {
+      el.className = 'tok';
+      span.textContent = u + ' — not loaded';
+    }
+  });
+}
+
+async function fetchToken(user) {
+  setOut('token-out', 'GET /dev/token?user=' + user + '\n\nFetching…');
+  try {
+    const res  = await fetch('/dev/token?user=' + user);
+    const data = await res.json();
+    if (data.token) saveToken(user, data.token);
+    document.getElementById('token-out').className = 'output';
+    document.getElementById('token-out').textContent = JSON.stringify(data, null, 2);
+    updateTokenStatus();
+  } catch (e) {
+    setOut('token-out', 'ERROR: ' + e.message, 'err');
+  }
+}
+
+// ─── Health ───────────────────────────────────────────────────────────────
+async function checkHealth() {
+  setOut('health-out', 'GET /actuator/health\n\nChecking…');
+  try {
+    const res  = await fetch('/actuator/health');
+    const data = await res.json();
+    const ok   = data.status === 'UP';
+    const el   = document.getElementById('health-out');
+    el.className  = 'output' + (ok ? ' ok' : ' err');
+    el.textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    setOut('health-out', 'ERROR: ' + e.message, 'err');
+  }
+}
+
+// ─── Transfers ────────────────────────────────────────────────────────────
+const riskClass   = { LOW: 'bg-low', MEDIUM: 'bg-med', HIGH: 'bg-high' };
+const statusClass = { POSTED: 'bg-posted', PENDING_REVIEW: 'bg-pend', REJECTED: 'bg-gray' };
+
+async function runTransfer(type) {
+  clearBadges();
+  document.getElementById('xfer-rule-hint').textContent = '';
+
+  if (!ctxValid || !demoCtx) {
+    setOut('xfer-out',
+      'ERROR: Demo context is invalid or not loaded.\n' +
+      '/dev/demo-context did not confirm account ownership for these token users.\n' +
+      'Complete Step 2 first.', 'err');
+    return;
+  }
+
+  const defs  = buildTransferDefs();
+  const def   = defs[type];
+  const token = getToken(def.user);
+
+  if (!token) {
+    setOut('xfer-out',
+      'ERROR: Missing customer token for "' + def.user + '".\n' +
+      'Get the required token in Step 3 first.', 'err');
+    return;
+  }
+
+  const idemKey     = crypto.randomUUID();
+  const bodyPayload = JSON.stringify(def.body, null, 2);
+
+  // ── Debug output shown BEFORE the request is sent ──
+  const debug =
+    '=== ' + def.label + '-risk transfer ===\n' +
+    '\n' +
+    'Using token user:    ' + def.user + '\n' +
+    'Source account:      ' + def.body.sourceAccountId + '\n' +
+    'Destination account: ' + def.body.destinationAccountId + '\n' +
+    'Amount (minor):      ' + def.body.amountMinor + '  ($' + (def.body.amountMinor / 100).toFixed(2) + ')\n' +
+    'Currency:            ' + def.body.currency + '\n' +
+    'Idempotency-Key:     ' + idemKey + '\n' +
+    '\n' +
+    'Request body:\n' + bodyPayload + '\n' +
+    '\n' +
+    'Endpoint: POST /api/transfers\n' +
+    '\n' +
+    def.hint + '\n' +
+    '\nSending…';
+
+  setOut('xfer-out', debug);
+
+  try {
+    const res  = await fetch('/api/transfers', {
+      method:  'POST',
+      headers: {
+        'Authorization':   'Bearer ' + token,
+        'Idempotency-Key': idemKey,
+        'Content-Type':    'application/json'
+      },
+      body: JSON.stringify(def.body)
+    });
+
+    const data = await res.json();
+    const rl   = data.riskLevel || '';
+    const st   = data.status    || '';
+
+    const badges = document.getElementById('xfer-badges');
+    if (rl) badges.innerHTML += badge(rl.toUpperCase(), riskClass[rl] || 'bg-gray');
+    if (st) badges.innerHTML += badge(st.replace(/_/g, ' '), statusClass[st] || 'bg-gray');
+    if (data.riskScore !== undefined) badges.innerHTML += badge('score ' + data.riskScore, 'bg-score');
+
+    document.getElementById('xfer-rule-hint').textContent = def.hint;
+
+    if (type === 'high' && data.transferId) sessionStorage.setItem('last_high_tid', data.transferId);
+
+    const out = document.getElementById('xfer-out');
+    out.className  = 'output' + (res.ok ? '' : ' err');
+    out.textContent =
+      '=== ' + def.label + '-risk transfer ===\n' +
+      '\n' +
+      'Using token user:    ' + def.user + '\n' +
+      'Source account:      ' + def.body.sourceAccountId + '\n' +
+      'Destination account: ' + def.body.destinationAccountId + '\n' +
+      'Request body:\n' + bodyPayload + '\n' +
+      '\n' +
+      'HTTP ' + res.status + '\n' +
+      'Idempotency-Key: ' + idemKey + '\n' +
+      '\n' +
+      JSON.stringify(data, null, 2);
+  } catch (e) {
+    setOut('xfer-out', 'ERROR: ' + e.message, 'err');
+  }
+}
+
+function clearBadges() { document.getElementById('xfer-badges').innerHTML = ''; }
+
+// ─── Analyst review ───────────────────────────────────────────────────────
+let selectedAlertId = null;
+
+async function listAlerts() {
+  const token = getToken('analyst');
+  if (!token) {
+    setOut('analyst-out', 'ERROR: Analyst token required. Click "Get analyst token" in Step 3 first.', 'err');
+    return;
+  }
+
+  selectedAlertId = null;
+  document.getElementById('alert-list').innerHTML = '';
+  setOut('analyst-out', 'GET /api/analyst/alerts?status=REVIEW_PENDING\n\nLoading…');
+
+  try {
+    const res  = await fetch('/api/analyst/alerts?status=REVIEW_PENDING', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setOut('analyst-out', 'ERROR ' + res.status + ':\n' + JSON.stringify(data, null, 2), 'err');
+      return;
+    }
+
+    document.getElementById('analyst-out').className  = 'output';
+    document.getElementById('analyst-out').textContent = JSON.stringify(data, null, 2);
+
+    const listEl = document.getElementById('alert-list');
+    if (!Array.isArray(data) || data.length === 0) {
+      listEl.innerHTML = '<div style="font-size:12px;color:#64748b;padding:6px 0;">No pending alerts. Run the HIGH-risk transfer first.</div>';
+      return;
+    }
+
+    data.forEach(a => {
+      const rl  = a.riskLevel || '';
+      const st  = a.status    || '';
+      const div = document.createElement('div');
+      div.className = 'alert-item';
+      div.dataset.alertId = a.alertId;
+      div.innerHTML =
+        '<div class="alert-header">' +
+          badge(rl, riskClass[rl] || 'bg-gray') +
+          badge(st.replace(/_/g, ' '), statusClass[st] || 'bg-gray') +
+          badge('score ' + a.riskScore, 'bg-score') +
+        '</div>' +
+        '<div class="meta">' +
+          'alertId:    ' + a.alertId + '<br>' +
+          'transferId: ' + a.transferId + '<br>' +
+          'rules:      ' + ((a.triggeredRules || []).join(' · ') || '—') +
+          (a.aiNarrative
+            ? '\nnarrative:  ' + a.aiNarrative.slice(0, 140) + (a.aiNarrative.length > 140 ? '…' : '')
+            : '') +
+        '</div>';
+      div.addEventListener('click', () => {
+        document.querySelectorAll('.alert-item').forEach(el => el.classList.remove('selected'));
+        div.classList.add('selected');
+        selectedAlertId = a.alertId;
+      });
+      listEl.appendChild(div);
+    });
+  } catch (e) {
+    setOut('analyst-out', 'ERROR: ' + e.message, 'err');
+  }
+}
+
+async function reviewAlert(action) {
+  const token = getToken('analyst');
+  if (!token) {
+    setOut('analyst-out', 'ERROR: Analyst token required. Click "Get analyst token" in Step 3 first.', 'err');
+    return;
+  }
+  if (!selectedAlertId) {
+    setOut('analyst-out', 'ERROR: No alert selected. Click an alert card above first.', 'err');
+    return;
+  }
+
+  const reason = action === 'approve'
+    ? 'Verified with customer via phone — legitimate business transfer'
+    : 'Unable to verify customer — transfer pattern consistent with fraud';
+
+  setOut('analyst-out', 'POST /api/analyst/alerts/' + selectedAlertId + '/' + action + '\n\nSending…');
+
+  try {
+    const res  = await fetch('/api/analyst/alerts/' + selectedAlertId + '/' + action, {
+      method:  'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type':  'application/json'
+      },
+      body: JSON.stringify({ reason })
+    });
+    const data = await res.json();
+    const out  = document.getElementById('analyst-out');
+    out.className  = 'output' + (res.ok ? '' : ' err');
+    out.textContent = 'HTTP ' + res.status + '\n\n' + JSON.stringify(data, null, 2);
+    selectedAlertId = null;
+    await listAlerts();
+  } catch (e) {
+    setOut('analyst-out', 'ERROR: ' + e.message, 'err');
+  }
+}
+
+// ─── Observability ────────────────────────────────────────────────────────
+async function fetchMetric(url, label) {
+  const token = getToken('analyst');
+  if (!token) {
+    setOut('obs-out',
+      'ERROR: Analyst token required. Click "Get analyst token" in Step 3 first.\n\n' +
+      'Metrics are protected by Spring Security. Opening ' + url + ' in the browser without a token\n' +
+      'returns {"code":"UNAUTHORIZED"} — this is expected behavior, not a bug.', 'err');
+    return;
+  }
+
+  setOut('obs-out', 'GET ' + url + '\nAuthorization: Bearer <analyst token>\n\nLoading ' + label + '…');
+
+  try {
+    const res         = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+    const contentType = res.headers.get('content-type') || '';
+
+    if (res.status === 401 || res.status === 403) {
+      setOut('obs-out',
+        'HTTP ' + res.status + ' — Metrics are protected by Spring Security.\n' +
+        'Get an analyst token (Step 3) and retry.', 'err');
+      return;
+    }
+
+    let body;
+    if (contentType.includes('application/json')) {
+      body = JSON.stringify(await res.json(), null, 2);
+    } else {
+      body = await res.text();
+    }
+
+    const out = document.getElementById('obs-out');
+    out.className  = 'output' + (res.ok ? '' : ' err');
+    out.textContent = 'HTTP ' + res.status + ' — ' + label + '\n\n' + body;
+  } catch (e) {
+    setOut('obs-out', 'ERROR: ' + e.message, 'err');
+  }
+}
+
+// ─── Utilities ────────────────────────────────────────────────────────────
+function badge(text, cls) {
+  return '<span class="badge ' + (cls || 'bg-gray') + '">' + text + '</span>';
+}
+
+function setOut(id, text, mod) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className   = 'output' + (mod ? ' ' + mod : '');
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────
+updateTokenStatus();
+</script>
+
+</body>
+</html>

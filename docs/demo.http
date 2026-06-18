@@ -1,0 +1,181 @@
+# Banking Risk Intelligence — Demo HTTP Requests
+# Works with: IntelliJ HTTP Client, VS Code REST Client extension
+#
+# Prerequisites:
+#   App running with local profile:
+#     ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+#   docker compose up -d postgres redis
+#
+# Run steps in order. Copy token values from step 0 responses into @customer1_token etc.
+
+@base = http://localhost:8080
+@account1 = 00000000-0000-0000-0000-000000000011
+@account2 = 00000000-0000-0000-0000-000000000012
+
+# ─── Step 0: Acquire tokens (local profile only) ─────────────────────────────
+
+### Get CUSTOMER1 token (USER_1 — no login anomaly, ACCOUNT_2 is known beneficiary)
+GET {{base}}/dev/token?user=customer1
+
+### Get CUSTOMER2 token (USER_2 — HAS login anomaly, no known beneficiaries)
+GET {{base}}/dev/token?user=customer2
+
+### Get ANALYST token
+GET {{base}}/dev/token?user=analyst
+
+# ── After running the three requests above, set these variables: ──────────────
+@customer1_token = <paste token from customer1 response>
+@customer2_token = <paste token from customer2 response>
+@analyst_token   = <paste token from analyst response>
+
+# ─── Step 1: LOW-risk transfer ────────────────────────────────────────────────
+# USER_1 → $5.00 → ACCOUNT_2 (known beneficiary, no anomaly)
+# Rules triggered: ACCOUNT_AGE_UNDER_7_DAYS (+20)
+# Expected score: 20  |  Level: LOW  |  Status: POSTED  |  No AI call
+
+### LOW transfer
+POST {{base}}/api/transfers
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: demo-low-001
+Content-Type: application/json
+
+{
+  "sourceAccountId": "{{account1}}",
+  "destinationAccountId": "{{account2}}",
+  "amountMinor": 500,
+  "currency": "USD"
+}
+
+# ─── Step 2: MEDIUM-risk transfer ────────────────────────────────────────────
+# USER_2 → $40.00 → ACCOUNT_1 (new beneficiary, login anomaly, age < 7 days)
+# Rules triggered: NEW_BENEFICIARY (+25) + ACCOUNT_AGE_UNDER_7_DAYS (+20) + LOGIN_ANOMALY (+16)
+# Expected score: 61  |  Level: MEDIUM  |  Status: POSTED  |  Async AI narrative queued
+
+### MEDIUM transfer
+POST {{base}}/api/transfers
+Authorization: Bearer {{customer2_token}}
+Idempotency-Key: demo-medium-001
+Content-Type: application/json
+
+{
+  "sourceAccountId": "{{account2}}",
+  "destinationAccountId": "{{account1}}",
+  "amountMinor": 4000,
+  "currency": "USD"
+}
+
+# ─── Step 3: HIGH-risk transfer #1 (will be APPROVED) ────────────────────────
+# USER_2 → $5,100.00 → ACCOUNT_1
+# Velocity from step 2 ($40.00) + current ($5,100.00) = $5,140.00 > $5,000.00 threshold
+# Rules triggered: NEW_BENEFICIARY (+25) + ACCOUNT_AGE_UNDER_7_DAYS (+20)
+#                  + LOGIN_ANOMALY (+16) + HOURLY_VELOCITY_OVER_5000 (+30)
+# Expected score: 91  |  Level: HIGH  |  Status: PENDING_REVIEW
+# Source funds HELD — destination NOT credited until analyst approves
+
+### HIGH transfer #1 (save transferId → high1_transfer_id)
+POST {{base}}/api/transfers
+Authorization: Bearer {{customer2_token}}
+Idempotency-Key: demo-high-001
+Content-Type: application/json
+
+{
+  "sourceAccountId": "{{account2}}",
+  "destinationAccountId": "{{account1}}",
+  "amountMinor": 510000,
+  "currency": "USD"
+}
+
+# ─── Step 4: HIGH-risk transfer #2 (will be REJECTED) ────────────────────────
+# USER_2 → $1,000.00 → ACCOUNT_1
+# Historical velocity: step2 ($40) + step3 ($5,100) = $5,140.00 already > $5,000.00 threshold
+# Same rules as step 3 — velocity still above threshold
+
+### HIGH transfer #2 (save transferId → high2_transfer_id)
+POST {{base}}/api/transfers
+Authorization: Bearer {{customer2_token}}
+Idempotency-Key: demo-high-002
+Content-Type: application/json
+
+{
+  "sourceAccountId": "{{account2}}",
+  "destinationAccountId": "{{account1}}",
+  "amountMinor": 100000,
+  "currency": "USD"
+}
+
+# ─── Step 5: List pending alerts (analyst dashboard) ─────────────────────────
+
+### List REVIEW_PENDING alerts
+GET {{base}}/api/analyst/alerts?status=REVIEW_PENDING
+Authorization: Bearer {{analyst_token}}
+
+# ── Copy alertId values for the two HIGH transfers into these variables: ───────
+@high1_alert_id = <paste alertId for high transfer #1>
+@high2_alert_id = <paste alertId for high transfer #2>
+
+# ─── Step 6: Analyst APPROVE ──────────────────────────────────────────────────
+# Approving HIGH #1: held funds settle to destination (ACCOUNT_1 credited)
+# Transfer moves from PENDING_REVIEW → POSTED
+# Source held balance released to destination
+
+### Approve HIGH alert #1
+POST {{base}}/api/analyst/alerts/{{high1_alert_id}}/approve
+Authorization: Bearer {{analyst_token}}
+Content-Type: application/json
+
+{
+  "reason": "Verified with customer via phone — legitimate business transfer"
+}
+
+# ─── Step 7: Analyst REJECT ───────────────────────────────────────────────────
+# Rejecting HIGH #2: held funds return to source (ACCOUNT_2 balance restored)
+# Transfer moves from PENDING_REVIEW → REJECTED
+
+### Reject HIGH alert #2
+POST {{base}}/api/analyst/alerts/{{high2_alert_id}}/reject
+Authorization: Bearer {{analyst_token}}
+Content-Type: application/json
+
+{
+  "reason": "Unable to verify customer — transfer pattern consistent with account takeover"
+}
+
+# ─── Step 8: Idempotency retry ────────────────────────────────────────────────
+# Resend step 1 with the exact same Idempotency-Key.
+# Expected: same transferId returned, no new ledger entries.
+
+### Idempotency retry (same key as step 1)
+POST {{base}}/api/transfers
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: demo-low-001
+Content-Type: application/json
+
+{
+  "sourceAccountId": "{{account1}}",
+  "destinationAccountId": "{{account2}}",
+  "amountMinor": 500,
+  "currency": "USD"
+}
+
+# ─── Step 9: Actuator health check ───────────────────────────────────────────
+
+### Health (no auth required)
+GET {{base}}/actuator/health
+
+# ─── Step 10: Metrics ─────────────────────────────────────────────────────────
+
+### Transfer creation latency histogram
+GET {{base}}/actuator/metrics/transfer.creation.latency
+Authorization: Bearer {{analyst_token}}
+
+### Risk level distribution
+GET {{base}}/actuator/metrics/risk.level.count
+Authorization: Bearer {{analyst_token}}
+
+### Idempotency cache hit counter
+GET {{base}}/actuator/metrics/idempotency.cache.hit
+Authorization: Bearer {{analyst_token}}
+
+### Prometheus scrape endpoint (for Grafana)
+GET {{base}}/actuator/prometheus
+Authorization: Bearer {{analyst_token}}
