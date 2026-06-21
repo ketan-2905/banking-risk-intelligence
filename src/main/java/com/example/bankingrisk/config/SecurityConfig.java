@@ -29,7 +29,7 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 // /dev/** only exists when DevTokenController is active (local profile)
-                .requestMatchers("/actuator/health", "/dev/**", "/demo", "/demo/**").permitAll()
+                .requestMatchers("/actuator/health", "/dev/**", "/demo", "/demo/**", "/showcase", "/showcase/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/transfers").hasAnyRole("CUSTOMER", "ADMIN")
                 .requestMatchers("/api/analyst/**").hasAnyRole("ANALYST", "ADMIN")
                 .requestMatchers("/dashboard/**").hasAnyRole("ANALYST", "ADMIN")

@@ -17,10 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Inserts synthetic demo data for local development only.
- * Never active in prod or test profiles. No real PII.
- */
 @Component
 @Profile("local")
 class LocalDataSeeder implements ApplicationRunner {
@@ -29,8 +25,6 @@ class LocalDataSeeder implements ApplicationRunner {
 
     static final UUID USER_1_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     static final UUID USER_2_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
-    static final UUID ACCOUNT_1_ID = UUID.fromString("00000000-0000-0000-0000-000000000011");
-    static final UUID ACCOUNT_2_ID = UUID.fromString("00000000-0000-0000-0000-000000000012");
 
     private final AccountRepository accountRepository;
     private final BeneficiaryRepository beneficiaryRepository;
@@ -51,14 +45,18 @@ class LocalDataSeeder implements ApplicationRunner {
             log.info("Local seed data already present, skipping");
             return;
         }
+        seedData();
+    }
 
+    @Transactional
+    void seedData() {
         log.info("Inserting local synthetic seed data");
 
         Account account1 = new Account();
         account1.setOwnerUserId(USER_1_ID);
         account1.setAccountNumber("DEMO-ACC-0001");
         account1.setCurrency("USD");
-        account1.setAvailableBalanceMinor(500_000_00L); // $500,000.00
+        account1.setAvailableBalanceMinor(50_000_000L); // $500,000.00
         account1.setHeldBalanceMinor(0L);
         accountRepository.save(account1);
 
@@ -66,7 +64,7 @@ class LocalDataSeeder implements ApplicationRunner {
         account2.setOwnerUserId(USER_2_ID);
         account2.setAccountNumber("DEMO-ACC-0002");
         account2.setCurrency("USD");
-        account2.setAvailableBalanceMinor(100_000_00L); // $100,000.00
+        account2.setAvailableBalanceMinor(10_000_000L); // $100,000.00
         account2.setHeldBalanceMinor(0L);
         Account savedAccount2 = accountRepository.save(account2);
 

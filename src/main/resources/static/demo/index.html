@@ -339,16 +339,13 @@
     </div>
     <div class="btn-row">
       <button class="btn-blue"  onclick="listAlerts()">List pending alerts</button>
-      <button class="btn-green" onclick="reviewAlert('approve')">Approve selected alert</button>
-      <button class="btn-red"   onclick="reviewAlert('reject')">Reject selected alert</button>
+      <button class="btn-red"   id="btn-high-5" onclick="runHighAndList()" disabled>Run HIGH transfer + list alerts</button>
     </div>
     <div class="alert-list" id="alert-list"></div>
-    <div id="analyst-out" class="output placeholder">Analyst response appears here.
+    <div id="analyst-out" class="output placeholder">Click "List pending alerts" after running the HIGH-risk transfer in Step 4.
 
-Alert cards show:
-  alertId, transferId, riskScore, riskLevel, status, triggered rules, AI narrative (if present)
-
-If no alerts: run the HIGH-risk transfer first.</div>
+Each alert card has inline Approve / Reject buttons.
+If the list is empty, click "Run HIGH transfer + list alerts" above (requires Step 2 context + customer2 token).</div>
   </div>
 
   <!-- ── Step 6: Observability ──────────────────────────────────────── -->
@@ -365,7 +362,7 @@ If no alerts: run the HIGH-risk transfer first.</div>
       <button class="btn-indigo" onclick="fetchMetric('/actuator/metrics',                           'Metrics list')">Load metrics list</button>
       <button class="btn-indigo" onclick="fetchMetric('/actuator/metrics/transfer.creation.latency', 'Transfer creation latency')">Load transfer creation latency</button>
       <button class="btn-indigo" onclick="fetchMetric('/actuator/metrics/risk.level.count',          'Risk level count')">Load risk level count</button>
-      <button class="btn-indigo" onclick="fetchMetric('/actuator/metrics/risk.score.histogram',      'Risk score histogram')">Load risk score histogram</button>
+      <button class="btn-indigo" onclick="fetchMetric('/actuator/metrics/risk.evaluation.latency',   'Risk evaluation latency')">Load risk evaluation latency</button>
       <button class="btn-indigo" onclick="fetchMetric('/actuator/prometheus',                        'Prometheus output')">Load Prometheus output</button>
     </div>
     <div id="obs-out" class="output placeholder">Metric output appears here. All buttons except "Check health" require analyst token.</div>
@@ -451,6 +448,7 @@ function disableTransferButtons(disabled) {
   ['btn-low', 'btn-medium', 'btn-high'].forEach(id => {
     document.getElementById(id).disabled = disabled;
   });
+  document.getElementById('btn-high-5').disabled = disabled;
 }
 
 function updateAccountsNote(valid, msg) {
@@ -686,26 +684,37 @@ async function listAlerts() {
     }
 
     data.forEach(a => {
-      const rl  = a.riskLevel || '';
-      const st  = a.status    || '';
-      const div = document.createElement('div');
+      const rl    = a.riskLevel || '';
+      const st    = a.status    || '';
+      const rules = (a.triggeredRules || []).map(r => (r.code || r) + ' (+' + (r.points || 0) + ')').join(' · ') || '—';
+      const div   = document.createElement('div');
       div.className = 'alert-item';
       div.dataset.alertId = a.alertId;
+
+      const isPending = st === 'REVIEW_PENDING';
       div.innerHTML =
         '<div class="alert-header">' +
           badge(rl, riskClass[rl] || 'bg-gray') +
           badge(st.replace(/_/g, ' '), statusClass[st] || 'bg-gray') +
           badge('score ' + a.riskScore, 'bg-score') +
+          (isPending
+            ? '<span style="margin-left:auto;display:flex;gap:6px;">' +
+                '<button class="btn-green" style="padding:4px 12px;font-size:11px;" onclick="reviewAlertById(\'' + a.alertId + '\',\'approve\')">Approve</button>' +
+                '<button class="btn-red"   style="padding:4px 12px;font-size:11px;" onclick="reviewAlertById(\'' + a.alertId + '\',\'reject\')">Reject</button>' +
+              '</span>'
+            : '') +
         '</div>' +
         '<div class="meta">' +
           'alertId:    ' + a.alertId + '<br>' +
           'transferId: ' + a.transferId + '<br>' +
-          'rules:      ' + ((a.triggeredRules || []).join(' · ') || '—') +
+          'rules:      ' + rules +
           (a.aiNarrative
             ? '\nnarrative:  ' + a.aiNarrative.slice(0, 140) + (a.aiNarrative.length > 140 ? '…' : '')
             : '') +
         '</div>';
-      div.addEventListener('click', () => {
+
+      div.addEventListener('click', (e) => {
+        if (e.target.tagName === 'BUTTON') return;
         document.querySelectorAll('.alert-item').forEach(el => el.classList.remove('selected'));
         div.classList.add('selected');
         selectedAlertId = a.alertId;
@@ -717,14 +726,10 @@ async function listAlerts() {
   }
 }
 
-async function reviewAlert(action) {
+async function reviewAlertById(alertId, action) {
   const token = getToken('analyst');
   if (!token) {
-    setOut('analyst-out', 'ERROR: Analyst token required. Click "Get analyst token" in Step 3 first.', 'err');
-    return;
-  }
-  if (!selectedAlertId) {
-    setOut('analyst-out', 'ERROR: No alert selected. Click an alert card above first.', 'err');
+    setOut('analyst-out', 'ERROR: Analyst token required. Get analyst token in Step 3 first.', 'err');
     return;
   }
 
@@ -732,10 +737,10 @@ async function reviewAlert(action) {
     ? 'Verified with customer via phone — legitimate business transfer'
     : 'Unable to verify customer — transfer pattern consistent with fraud';
 
-  setOut('analyst-out', 'POST /api/analyst/alerts/' + selectedAlertId + '/' + action + '\n\nSending…');
+  setOut('analyst-out', 'POST /api/analyst/alerts/' + alertId + '/' + action + '\n\nSending…');
 
   try {
-    const res  = await fetch('/api/analyst/alerts/' + selectedAlertId + '/' + action, {
+    const res  = await fetch('/api/analyst/alerts/' + alertId + '/' + action, {
       method:  'POST',
       headers: {
         'Authorization': 'Bearer ' + token,
@@ -752,6 +757,14 @@ async function reviewAlert(action) {
   } catch (e) {
     setOut('analyst-out', 'ERROR: ' + e.message, 'err');
   }
+}
+
+async function reviewAlert(action) {
+  if (!selectedAlertId) {
+    setOut('analyst-out', 'ERROR: No alert selected. Click an alert card above first.', 'err');
+    return;
+  }
+  await reviewAlertById(selectedAlertId, action);
 }
 
 // ─── Observability ────────────────────────────────────────────────────────
@@ -802,6 +815,12 @@ function setOut(id, text, mod) {
   const el = document.getElementById(id);
   el.textContent = text;
   el.className   = 'output' + (mod ? ' ' + mod : '');
+}
+
+// ─── Run HIGH then immediately list alerts ────────────────────────────────
+async function runHighAndList() {
+  await runTransfer('high');
+  await listAlerts();
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────

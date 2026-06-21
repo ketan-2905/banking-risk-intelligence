@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Risk Intelligence — Live Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+* { box-sizing: border-box; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #07090f;
+  color: #e2e8f0;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
+
+/* Cards */
+.card {
+  background: #0d1117;
+  border: 1px solid #161b27;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.4), 0 0 0 0.5px rgba(255,255,255,.03) inset;
+}
+.card-highlight {
+  background: linear-gradient(135deg, #0d1117 0%, #111827 100%);
+  border: 1px solid #1e2d40;
+}
+
+/* Speed pills */
+.speed-pill {
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+  border: 1px solid #1e293b;
+  background: transparent;
+  color: #64748b;
+  user-select: none;
+}
+.speed-pill:hover { background: #1e293b; color: #94a3b8; }
+.speed-pill.active { background: #1d4ed8; border-color: #3b82f6; color: #fff; }
+
+/* Step progress */
+.step-node {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700;
+  border: 1.5px solid #1e293b;
+  background: #0d1117;
+  color: #475569;
+  transition: all .3s;
+  flex-shrink: 0;
+}
+.step-node.active { background: #1d4ed8; border-color: #60a5fa; color: #fff; animation: stepPulse 1s infinite; }
+.step-node.done   { background: #065f46; border-color: #10b981; color: #6ee7b7; }
+
+@keyframes stepPulse { 0%,100%{box-shadow:0 0 0 0 #3b82f640} 50%{box-shadow:0 0 0 4px #3b82f620} }
+
+/* Animations */
+@keyframes slideUp   { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn    { from{opacity:0} to{opacity:1} }
+@keyframes bumpGreen { 0%,100%{color:inherit} 45%{color:#10b981;transform:scale(1.06)} }
+@keyframes bumpRed   { 0%,100%{color:inherit} 45%{color:#ef4444;transform:scale(1.06)} }
+@keyframes glowGreen { 0%,100%{box-shadow:none} 50%{box-shadow:0 0 0 2px #10b98120, 0 0 18px #10b98118} }
+@keyframes glowRed   { 0%,100%{box-shadow:none} 50%{box-shadow:0 0 0 2px #ef444420, 0 0 18px #ef444418} }
+@keyframes glowAmber { 0%,100%{box-shadow:none} 50%{box-shadow:0 0 0 2px #f59e0b20, 0 0 18px #f59e0b18} }
+@keyframes dotFly    { 0%{left:-2%;opacity:0} 8%{opacity:1} 90%{opacity:1} 100%{left:103%;opacity:0} }
+@keyframes dotFlyRev { 0%{right:-2%;opacity:0} 8%{opacity:1} 90%{opacity:1} 100%{right:103%;opacity:0} }
+@keyframes pulse     { 0%,100%{opacity:1} 50%{opacity:.45} }
+@keyframes logSlide  { from{opacity:0;transform:translateX(8px)} to{opacity:1;transform:translateX(0)} }
+
+.slide-up  { animation: slideUp  .25s ease-out; }
+.fade-in   { animation: fadeIn   .4s  ease-out; }
+.bump-up   { animation: bumpGreen .65s ease; display:inline-block; }
+.bump-dn   { animation: bumpRed   .65s ease; display:inline-block; }
+.glow-g    { animation: glowGreen .9s ease; }
+.glow-r    { animation: glowRed   .9s ease; }
+.glow-a    { animation: glowAmber .9s ease; }
+.log-entry { animation: logSlide .2s ease-out; }
+.blink     { animation: pulse 1.2s ease-in-out infinite; }
+
+.dot-fly-fwd {
+  position:absolute; top:50%; transform:translateY(-50%);
+  width:10px; height:10px; border-radius:50%;
+  animation: dotFly var(--fly-dur,.9s) ease-in-out forwards;
+}
+.dot-fly-rev {
+  position:absolute; top:50%; transform:translateY(-50%);
+  width:10px; height:10px; border-radius:50%;
+  animation: dotFlyRev var(--fly-dur,.9s) ease-in-out forwards;
+}
+
+.score-fill { transition: width .55s cubic-bezier(.4,0,.2,1), background-color .35s; }
+.vel-fill   { transition: width .6s cubic-bezier(.4,0,.2,1); }
+
+/* Trend pill */
+.trend-up   { color:#10b981; font-size:10px; font-weight:600; }
+.trend-down { color:#ef4444; font-size:10px; font-weight:600; }
+.trend-neutral { color:#64748b; font-size:10px; }
+
+/* Arch strip chips */
+.arch-chip {
+  flex: 1; padding: 7px 10px; border-radius: 8px;
+  border: 1px solid #161b27;
+  background: #0d1117;
+  transition: all .35s;
+  min-width: 0;
+  cursor: default;
+}
+.arch-chip.lit {
+  border-color: #1e3a8a;
+  background: linear-gradient(135deg, #0a1628, #0d1f3c);
+  box-shadow: 0 0 12px #1d4ed820;
+}
+.arch-chip .chip-title { font-size:10px; font-weight:600; color:#334155; transition:color .35s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.arch-chip .chip-desc  { font-size:8.5px; color:#1e293b; margin-top:2px; transition:color .35s; line-height:1.35; }
+.arch-chip.lit .chip-title { color: #60a5fa; }
+.arch-chip.lit .chip-desc  { color: #334155; }
+
+/* Burst tile */
+@keyframes tileIn { from{opacity:0;transform:scale(.94)} to{opacity:1;transform:scale(1)} }
+.burst-tile { animation: tileIn .18s ease-out; border-radius:8px; padding:7px 9px; border:1px solid #161b27; background:#080d1a; }
+.burst-tile.resolving { border-color:#1e3a8a; }
+.burst-tile.posted    { border-color:#166534; background:#052012; }
+.burst-tile.held      { border-color:#92400e; background:#1c1000; }
+.burst-tile.failed    { border-color:#7f1d1d; background:#1c0505; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════ HEADER ══════ -->
+<header style="height:52px;border-bottom:1px solid #161b27;flex-shrink:0" class="flex items-center px-4 gap-4">
+
+  <!-- Logo -->
+  <div class="flex items-center gap-2.5 mr-2">
+    <div style="width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#1d4ed8,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">
+      🏦
+    </div>
+    <div>
+      <div style="font-size:13px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px">Risk Intelligence</div>
+      <div style="font-size:9px;color:#334155;letter-spacing:.3px;text-transform:uppercase">Spring Boot 3 · PostgreSQL · Redis · JWT · Micrometer</div>
+    </div>
+  </div>
+
+  <!-- Step progress -->
+  <div id="steps-bar" class="flex items-center gap-0 flex-1 min-w-0"></div>
+
+  <!-- Speed selector -->
+  <div class="flex items-center gap-1 ml-2 shrink-0">
+    <span style="font-size:10px;color:#475569;margin-right:4px;font-weight:500">Speed</span>
+    <div class="flex gap-1" id="speed-pills">
+      <button class="speed-pill" data-v="0.25">¼×</button>
+      <button class="speed-pill" data-v="0.5">½×</button>
+      <button class="speed-pill" data-v="0.75">¾×</button>
+      <button class="speed-pill active" data-v="1">1×</button>
+      <button class="speed-pill" data-v="1.25">1.25×</button>
+      <button class="speed-pill" data-v="1.5">1.5×</button>
+      <button class="speed-pill" data-v="1.75">1.75×</button>
+      <button class="speed-pill" data-v="2">2×</button>
+    </div>
+  </div>
+
+  <!-- Status + run button -->
+  <div class="flex items-center gap-2 ml-2 shrink-0">
+    <div id="status-badge" style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;background:#111827;border:1px solid #1e293b;color:#475569">IDLE</div>
+    <button id="start-btn" onclick="startDemo()"
+      style="padding:7px 18px;border-radius:8px;font-size:12px;font-weight:700;background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#fff;border:1px solid #3b82f6;cursor:pointer;transition:all .15s;box-shadow:0 2px 8px #1d4ed830"
+      onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform=''">
+      ▶ Run Demo
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════ MAIN GRID ══ -->
+<div style="flex:1;display:grid;grid-template-columns:230px 1fr 1fr 230px;gap:10px;padding:10px;overflow:hidden;min-height:0">
+
+  <!-- ════ COL 1 — LEFT SIDEBAR ════ -->
+  <div style="display:flex;flex-direction:column;gap:8px;min-height:0;overflow-y:auto">
+
+    <!-- Customer 1 -->
+    <div class="card card-highlight" id="card-c1" style="padding:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#1e3a8a,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#93c5fd">C1</div>
+          <div>
+            <div style="font-size:11px;font-weight:600;color:#93c5fd">Customer 1</div>
+            <div style="font-size:9px;color:#334155;font-family:monospace" id="c1-num">DEMO-ACC-0001</div>
+          </div>
+        </div>
+        <div id="c1-dot" style="width:7px;height:7px;border-radius:50%;background:#1e293b"></div>
+      </div>
+      <div style="font-size:22px;font-weight:800;color:#f1f5f9;letter-spacing:-1px" id="c1-bal">—</div>
+      <div style="font-size:9px;color:#334155;margin-top:2px">Available balance</div>
+      <div id="c1-trend" style="margin-top:6px;font-size:10px;color:#475569">—</div>
+      <div id="c1-held-row" style="display:none;margin-top:6px;background:#422006;border:1px solid #92400e;border-radius:6px;padding:4px 8px">
+        <div style="font-size:10px;font-weight:600;color:#fbbf24">🔒 Held: <span id="c1-held">$0</span></div>
+      </div>
+    </div>
+
+    <!-- Customer 2 -->
+    <div class="card card-highlight" id="card-c2" style="padding:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#4a1d96,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#c4b5fd">C2</div>
+          <div>
+            <div style="font-size:11px;font-weight:600;color:#c4b5fd">Customer 2</div>
+            <div style="font-size:9px;color:#334155;font-family:monospace" id="c2-num">DEMO-ACC-0002</div>
+          </div>
+        </div>
+        <div id="c2-dot" style="width:7px;height:7px;border-radius:50%;background:#1e293b"></div>
+      </div>
+      <div style="font-size:22px;font-weight:800;color:#f1f5f9;letter-spacing:-1px" id="c2-bal">—</div>
+      <div style="font-size:9px;color:#334155;margin-top:2px">Available balance</div>
+      <div id="c2-trend" style="margin-top:6px;font-size:10px;color:#475569">—</div>
+      <div id="c2-held-row" style="display:none;margin-top:6px;background:#422006;border:1px solid #92400e;border-radius:6px;padding:4px 8px">
+        <div style="font-size:10px;font-weight:600;color:#fbbf24">🔒 Held: <span id="c2-held">$0</span></div>
+      </div>
+    </div>
+
+    <!-- Escrow card -->
+    <div class="card" id="escrow-card" style="padding:14px;border-color:#1c2000">
+      <div style="font-size:10px;font-weight:600;color:#a16207;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Escrow Hold</div>
+      <div style="font-size:20px;font-weight:800;color:#fbbf24;letter-spacing:-1px" id="escrow-val">$0.00</div>
+      <div style="font-size:9px;color:#334155;margin-top:2px">Pending analyst review</div>
+      <div style="margin-top:8px">
+        <div style="height:3px;background:#1e293b;border-radius:2px;overflow:hidden">
+          <div id="escrow-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#d97706,#f59e0b);transition:width .6s ease;border-radius:2px"></div>
+        </div>
+      </div>
+      <div id="escrow-desc" style="font-size:9px;color:#475569;margin-top:4px;font-style:italic">No pending holds</div>
+    </div>
+
+    <!-- Session metrics -->
+    <div class="card" style="padding:14px;flex:1">
+      <div style="font-size:10px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Session</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:#f1f5f9" id="cnt-calls">0</div>
+          <div style="font-size:9px;color:#334155">API calls</div>
+        </div>
+        <div>
+          <div style="font-size:18px;font-weight:700;color:#f1f5f9" id="cnt-unique">0</div>
+          <div style="font-size:9px;color:#334155">Transfers</div>
+        </div>
+        <div>
+          <div style="font-size:18px;font-weight:700;color:#10b981" id="cnt-approved">0</div>
+          <div style="font-size:9px;color:#334155">Approved</div>
+        </div>
+        <div>
+          <div style="font-size:18px;font-weight:700;color:#ef4444" id="cnt-rejected">0</div>
+          <div style="font-size:9px;color:#334155">Rejected</div>
+        </div>
+        <div>
+          <div style="font-size:18px;font-weight:700;color:#a78bfa" id="cnt-idem">0</div>
+          <div style="font-size:9px;color:#334155">Idem saves</div>
+        </div>
+        <div>
+          <div style="font-size:18px;font-weight:700;color:#fbbf24" id="cnt-escrow">$0</div>
+          <div style="font-size:9px;color:#334155">Escrow vol</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ COL 2 — CENTER LEFT ════ -->
+  <div style="display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden">
+
+    <!-- Balance trend chart -->
+    <div class="card" style="padding:14px;flex-shrink:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:#94a3b8">Balance Overview</div>
+          <div style="font-size:9px;color:#334155;margin-top:1px">Live balance changes during demo</div>
+        </div>
+        <div style="display:flex;gap:10px">
+          <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:#3b82f6"></div><span style="font-size:9px;color:#475569">C1</span></div>
+          <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:#8b5cf6"></div><span style="font-size:9px;color:#475569">C2</span></div>
+        </div>
+      </div>
+      <div style="height:110px"><canvas id="chart-balance"></canvas></div>
+    </div>
+
+    <!-- Transfer flow -->
+    <div class="card" style="padding:14px;flex-shrink:0">
+      <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:12px">Transfer Flow</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <!-- Node C1 -->
+        <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;gap:3px">
+          <div id="node-c1" style="width:38px;height:38px;border-radius:50%;background:#0d1b3e;border:2px solid #1e3a8a;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#60a5fa;transition:all .3s">C1</div>
+          <div style="font-size:8px;color:#334155">DEMO-0001</div>
+        </div>
+        <!-- Track -->
+        <div style="flex:1;position:relative;height:32px;display:flex;align-items:center">
+          <div style="width:100%;height:1px;background:#1e293b;position:relative;overflow:visible" id="flow-track">
+          </div>
+          <div id="flow-label" style="position:absolute;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#0d1117;border:1px solid #1e293b;color:#475569;white-space:nowrap">—</div>
+        </div>
+        <!-- Node C2 -->
+        <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;gap:3px">
+          <div id="node-c2" style="width:38px;height:38px;border-radius:50%;background:#1a0b3e;border:2px solid #4a1d96;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#a78bfa;transition:all .3s">C2</div>
+          <div style="font-size:8px;color:#334155">DEMO-0002</div>
+        </div>
+      </div>
+      <!-- Escrow drop -->
+      <div id="escrow-drop" style="display:none;flex-direction:column;align-items:center;margin-top:6px">
+        <div style="width:1px;height:12px;background:#d97706"></div>
+        <div style="font-size:9px;font-weight:600;color:#fbbf24;background:#1c1000;border:1px solid #92400e;border-radius:6px;padding:3px 10px">ESCROW — Pending Review</div>
+      </div>
+      <!-- Transfer detail -->
+      <div id="xfer-detail" style="margin-top:10px;background:#080d1a;border-radius:8px;padding:10px;font-family:monospace;font-size:10px;min-height:48px;line-height:1.7">
+        <span style="color:#334155;font-style:italic">No transfer in progress</span>
+      </div>
+    </div>
+
+    <!-- Narration / Burst (shares same card) -->
+    <div class="card" style="padding:14px;flex:1;min-height:0;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-shrink:0">
+        <div style="font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;letter-spacing:.4px" id="narration-label">What's Happening</div>
+        <div id="burst-meta" style="display:none;gap:8px">
+          <span style="font-size:9px;color:#334155">in-flight <strong id="burst-inflight" style="color:#f1f5f9">0</strong></span>
+          <span style="font-size:9px;color:#334155">done <strong id="burst-done" style="color:#10b981">0</strong></span>
+          <span style="font-size:9px;color:#334155">escrow <strong id="burst-held" style="color:#fbbf24">0</strong></span>
+          <span style="font-size:9px;color:#334155"><strong id="burst-rps" style="color:#a78bfa">—</strong> req/s</span>
+        </div>
+      </div>
+      <!-- narration text -->
+      <div id="narration" style="font-size:12px;color:#94a3b8;line-height:1.6">
+        Press <strong style="color:#60a5fa">▶ Run Demo</strong> to run all 10 scenarios automatically.
+      </div>
+      <!-- burst grid (hidden until burst step) -->
+      <div id="burst-grid" style="display:none;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-top:8px;flex:1;align-content:start"></div>
+    </div>
+  </div>
+
+  <!-- ════ COL 3 — CENTER RIGHT ════ -->
+  <div style="display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden">
+
+    <!-- Risk score gauge -->
+    <div class="card" style="padding:14px;flex-shrink:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div style="font-size:11px;font-weight:600;color:#94a3b8">Risk Score</div>
+        <div id="risk-badge" style="padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;background:#111827;border:1px solid #1e293b;color:#475569">—</div>
+      </div>
+      <!-- Arc gauge -->
+      <div style="position:relative;height:100px;display:flex;align-items:flex-end;justify-content:center">
+        <canvas id="chart-gauge" width="180" height="100" style="position:absolute;top:0;left:50%;transform:translateX(-50%)"></canvas>
+        <div style="position:relative;z-index:1;text-align:center;padding-bottom:4px">
+          <div style="font-size:30px;font-weight:800;color:#f1f5f9;letter-spacing:-2px;line-height:1" id="score-num">0</div>
+          <div style="font-size:9px;color:#334155;margin-top:1px">out of 100</div>
+        </div>
+      </div>
+      <!-- Rules list -->
+      <div style="margin-top:8px;border-top:1px solid #161b27;padding-top:8px">
+        <div style="font-size:9px;font-weight:600;color:#334155;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Triggered Rules</div>
+        <div id="rules-list" style="display:flex;flex-direction:column;gap:4px;min-height:36px">
+          <div style="font-size:10px;color:#1e293b;font-style:italic">No rules fired yet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Velocity meter -->
+    <div class="card" style="padding:14px;flex-shrink:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:#94a3b8">Hourly Velocity</div>
+          <div style="font-size:9px;color:#334155;margin-top:1px">Threshold: $5,000.00</div>
+        </div>
+        <div id="vel-amount" style="font-size:13px;font-weight:700;color:#f1f5f9">$0</div>
+      </div>
+      <div style="height:8px;background:#111827;border-radius:4px;overflow:hidden;margin-bottom:6px">
+        <div id="vel-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#10b981,#eab308);border-radius:4px" class="vel-fill"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:#334155">
+        <span>$0</span>
+        <span id="vel-pct" style="color:#475569;font-weight:600">0%</span>
+        <span>$5,000</span>
+      </div>
+    </div>
+
+    <!-- Live risk distribution -->
+    <div class="card" style="padding:14px;flex-shrink:0">
+      <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:10px">Risk Distribution</div>
+      <div style="display:flex;gap:8px;align-items:flex-end;height:80px">
+        <canvas id="chart-dist" style="height:80px"></canvas>
+      </div>
+    </div>
+
+    <!-- Live alerts feed -->
+    <div class="card" style="padding:14px;flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0">
+        <div style="font-size:11px;font-weight:600;color:#94a3b8">Alert Feed</div>
+        <div id="alert-count" style="font-size:9px;color:#334155">0 alerts</div>
+      </div>
+      <div id="alert-feed" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px">
+        <div style="font-size:10px;color:#1e293b;font-style:italic">Waiting for transfers…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ COL 4 — RIGHT SIDEBAR (LOG) ════ -->
+  <div class="card" style="padding:12px;display:flex;flex-direction:column;min-height:0">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0">
+      <div style="font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;letter-spacing:.4px">Live Log</div>
+      <div id="log-count" style="font-size:9px;color:#1e293b">0 events</div>
+    </div>
+    <div id="log-stream" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:3px;font-family:monospace;font-size:9.5px;line-height:1.5">
+      <div style="color:#1e293b;font-style:italic">Waiting for demo…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═════════════════════ BOTTOM STATUS BAR ════════════════════ -->
+<div style="height:32px;border-top:1px solid #161b27;display:flex;align-items:center;padding:0 16px;gap:16px;font-size:10px;flex-shrink:0;background:#07090f">
+  <div style="display:flex;align-items:center;gap:5px"><span style="color:#475569">Total</span><span id="s-total" style="font-weight:700;color:#f1f5f9">0</span></div>
+  <div style="display:flex;align-items:center;gap:4px"><div style="width:6px;height:6px;border-radius:50%;background:#10b981"></div><span style="color:#10b981;font-weight:600" id="s-low">0 LOW</span></div>
+  <div style="display:flex;align-items:center;gap:4px"><div style="width:6px;height:6px;border-radius:50%;background:#eab308"></div><span style="color:#eab308;font-weight:600" id="s-med">0 MED</span></div>
+  <div style="display:flex;align-items:center;gap:4px"><div style="width:6px;height:6px;border-radius:50%;background:#ef4444"></div><span style="color:#ef4444;font-weight:600" id="s-high">0 HIGH</span></div>
+  <div style="width:1px;height:16px;background:#161b27"></div>
+  <div style="color:#475569">Approved <span id="s-approved" style="color:#10b981;font-weight:700">0</span></div>
+  <div style="color:#475569">Rejected <span id="s-rejected" style="color:#ef4444;font-weight:700">0</span></div>
+  <div style="width:1px;height:16px;background:#161b27"></div>
+  <div style="color:#475569">Escrow Vol <span id="s-escrow-vol" style="color:#fbbf24;font-weight:700">$0</span></div>
+  <div style="margin-left:auto;color:#475569">Redis Idem Saves <span id="s-idem" style="color:#a78bfa;font-weight:700">0</span></div>
+</div>
+
+<script>
+'use strict';
+
+// ─── Speed control ──────────────────────────────────────────────────────────
+let SPEED = 1.0;
+document.querySelectorAll('.speed-pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    SPEED = parseFloat(btn.dataset.v);
+    document.querySelectorAll('.speed-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const track = document.getElementById('flow-track');
+    if (track) track.style.setProperty('--fly-dur', (0.9 / SPEED) + 's');
+  });
+});
+
+function pause(ms) { return new Promise(r => setTimeout(r, ms / SPEED)); }
+
+// ─── Steps ──────────────────────────────────────────────────────────────────
+const STEPS = [
+  { id:'reset',   label:'Reset'    },
+  { id:'auth',    label:'Auth'     },
+  { id:'low',     label:'LOW'      },
+  { id:'medium',  label:'MEDIUM'   },
+  { id:'high1',   label:'HIGH'     },
+  { id:'approve', label:'Approve'  },
+  { id:'high2',   label:'Reject'   },
+  { id:'idem',    label:'Idem.'    },
+  { id:'burst',   label:'Burst×8'  },
+  { id:'metrics', label:'Metrics'  },
+];
+
+(function initSteps() {
+  const bar = document.getElementById('steps-bar');
+  STEPS.forEach((s, i) => {
+    if (i > 0) {
+      const line = document.createElement('div');
+      line.style.cssText = 'flex:1;height:1px;background:#161b27;margin:0 2px';
+      bar.appendChild(line);
+    }
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0';
+    wrap.innerHTML = `
+      <div class="step-node" id="step-${s.id}">${i+1}</div>
+      <div style="font-size:8px;color:#334155;white-space:nowrap">${s.label}</div>`;
+    bar.appendChild(wrap);
+  });
+})();
+
+function setStep(id, state) {
+  const el = document.getElementById('step-' + id);
+  if (!el) return;
+  el.className = 'step-node' + (state === 'running' ? ' active' : state === 'done' ? ' done' : '');
+}
+
+// ─── State ──────────────────────────────────────────────────────────────────
+const S = {
+  tokens: {}, ctx: null, running: false,
+  logCount: 0, apiCalls: 0, uniqueTransfers: 0, idemSaves: 0, escrowVolMinor: 0,
+  stats: { total:0, low:0, medium:0, high:0, approved:0, rejected:0 },
+  scoreHistory: [], balanceHistory: { c1:[], c2:[], labels:[] },
+  velocityMinor: 0,
+  alerts: [],
+};
+
+// ─── Charts ─────────────────────────────────────────────────────────────────
+Chart.defaults.color = '#475569';
+Chart.defaults.font.family = 'Inter, sans-serif';
+
+let gaugeChart = null, balanceChart = null, distChart = null;
+
+function initCharts() {
+  // Gauge (half-doughnut)
+  const gctx = document.getElementById('chart-gauge').getContext('2d');
+  gaugeChart = new Chart(gctx, {
+    type: 'doughnut',
+    data: {
+      datasets: [
+        { data: [0, 100], backgroundColor: ['#1e293b','#111827'], borderWidth:0, weight:1 },
+        { data: [40, 40, 20], backgroundColor: ['#10b98122','#eab30822','#ef444422'], borderWidth:0, weight:.15 }
+      ]
+    },
+    options: {
+      rotation: -90, circumference: 180, cutout: '70%',
+      plugins: { legend:{ display:false }, tooltip:{ enabled:false } },
+      events: [], animation: { duration: 400 }
+    }
+  });
+
+  // Balance line chart
+  const bctx = document.getElementById('chart-balance').getContext('2d');
+  balanceChart = new Chart(bctx, {
+    type: 'line',
+    data: {
+      labels: ['Start'],
+      datasets: [
+        { label:'C1', data:[], borderColor:'#3b82f6', backgroundColor:'#3b82f610', borderWidth:2, pointRadius:3, pointBackgroundColor:'#3b82f6', tension:.4, fill:true },
+        { label:'C2', data:[], borderColor:'#8b5cf6', backgroundColor:'#8b5cf608', borderWidth:2, pointRadius:3, pointBackgroundColor:'#8b5cf6', tension:.4, fill:true }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration:400 },
+      plugins: { legend:{ display:false }, tooltip:{ callbacks:{ label: ctx => '$'+(ctx.raw/100).toLocaleString('en-US',{minimumFractionDigits:0}) } } },
+      scales: {
+        x: { grid:{ color:'#111827' }, ticks:{ font:{size:8}, color:'#334155', maxTicksLimit:6 } },
+        y: { grid:{ color:'#111827' }, ticks:{ font:{size:8}, color:'#334155', callback: v => '$'+(v/100000).toFixed(0)+'k', maxTicksLimit:5 } }
+      }
+    }
+  });
+
+  // Risk distribution bar
+  const dctx = document.getElementById('chart-dist').getContext('2d');
+  distChart = new Chart(dctx, {
+    type: 'bar',
+    data: {
+      labels: ['LOW','MED','HIGH'],
+      datasets:[{ data:[0,0,0], backgroundColor:['#10b981','#eab308','#ef4444'], borderRadius:4, borderSkipped:false }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false, animation:{ duration:400 },
+      plugins:{ legend:{display:false}, tooltip:{enabled:false} },
+      scales:{
+        x:{ grid:{display:false}, ticks:{font:{size:9},color:'#475569'} },
+        y:{ grid:{color:'#111827'}, ticks:{font:{size:8},color:'#334155',precision:0}, beginAtZero:true }
+      }
+    }
+  });
+}
+
+function updateGauge(score) {
+  const colors = score < 40 ? ['#10b981','#111827'] : score < 80 ? ['#eab308','#111827'] : ['#ef4444','#111827'];
+  gaugeChart.data.datasets[0].data = [score, 100 - score];
+  gaugeChart.data.datasets[0].backgroundColor = colors;
+  gaugeChart.update();
+  document.getElementById('score-num').textContent = score;
+}
+
+function pushBalance(label, c1Minor, c2Minor) {
+  balanceChart.data.labels.push(label);
+  balanceChart.data.datasets[0].data.push(c1Minor);
+  balanceChart.data.datasets[1].data.push(c2Minor);
+  balanceChart.update();
+}
+
+function updateDist() {
+  distChart.data.datasets[0].data = [S.stats.low, S.stats.medium, S.stats.high];
+  distChart.update();
+}
+
+// ─── Velocity ────────────────────────────────────────────────────────────────
+function updateVelocity(addMinor) {
+  S.velocityMinor += addMinor;
+  const threshold = 500000; // $5,000 in minor
+  const pct = Math.min(S.velocityMinor / threshold * 100, 100);
+  const bar = document.getElementById('vel-bar');
+  bar.style.width = pct + '%';
+  if (pct >= 100) bar.style.background = 'linear-gradient(90deg,#ef4444,#dc2626)';
+  else if (pct >= 60) bar.style.background = 'linear-gradient(90deg,#d97706,#ef4444)';
+  else bar.style.background = 'linear-gradient(90deg,#10b981,#eab308)';
+  document.getElementById('vel-amount').textContent = '$' + (S.velocityMinor/100).toLocaleString('en-US',{minimumFractionDigits:2});
+  document.getElementById('vel-pct').textContent = pct.toFixed(0) + '%';
+  document.getElementById('vel-pct').style.color = pct >= 100 ? '#ef4444' : '#64748b';
+}
+
+// ─── Alert feed ──────────────────────────────────────────────────────────────
+function pushAlert(level, amount, status, extra) {
+  const feed = document.getElementById('alert-feed');
+  const first = feed.firstChild;
+  if (first?.style?.fontStyle === 'italic') first.remove();
+
+  S.alerts.unshift({ level, amount, status, extra });
+  document.getElementById('alert-count').textContent = S.alerts.length + ' alerts';
+
+  const colors = { LOW:'#10b981', MEDIUM:'#eab308', HIGH:'#ef4444', POSTED:'#10b981', PENDING_REVIEW:'#f59e0b', APPROVED:'#10b981', REJECTED:'#ef4444' };
+  const levelColor = colors[level] || '#475569';
+  const statusColor = colors[status] || '#475569';
+
+  const row = document.createElement('div');
+  row.className = 'slide-up';
+  row.style.cssText = `background:#0a0f1a;border:1px solid #161b27;border-left:2px solid ${levelColor};border-radius:6px;padding:7px 9px;flex-shrink:0`;
+  row.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:10px;font-weight:600;color:${levelColor}">${level}</span>
+      <span style="font-size:10px;font-weight:600;color:${statusColor}">${status}</span>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:2px">
+      <span style="font-size:11px;font-weight:700;color:#f1f5f9">${amount}</span>
+      ${extra ? `<span style="font-size:9px;color:#334155">${extra}</span>` : ''}
+    </div>`;
+  feed.insertBefore(row, feed.firstChild);
+}
+
+// ─── Log ─────────────────────────────────────────────────────────────────────
+const LOG_STYLE = {
+  info:    'color:#475569',
+  success: 'color:#10b981',
+  warn:    'color:#f59e0b',
+  error:   'color:#ef4444',
+  api:     'color:#818cf8',
+  data:    'color:#22d3ee',
+};
+
+function log(msg, type = 'info') {
+  const stream = document.getElementById('log-stream');
+  const first = stream.firstChild;
+  if (first?.style?.fontStyle === 'italic') first.remove();
+
+  const t = new Date().toTimeString().slice(0,8);
+  const row = document.createElement('div');
+  row.className = 'log-entry';
+  row.style.cssText = `display:flex;gap:6px;${LOG_STYLE[type]||LOG_STYLE.info}`;
+  row.innerHTML = `<span style="color:#1e293b;flex-shrink:0">${t}</span><span>${esc(msg)}</span>`;
+  stream.appendChild(row);
+  stream.scrollTop = stream.scrollHeight;
+  S.logCount++;
+  document.getElementById('log-count').textContent = S.logCount + ' events';
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── Narration & status ──────────────────────────────────────────────────────
+function narrate(html) { document.getElementById('narration').innerHTML = html; }
+
+function setStatus(txt, type) {
+  const el = document.getElementById('status-badge');
+  const styles = {
+    idle:   'background:#111827;border:1px solid #1e293b;color:#475569',
+    blue:   'background:#0f1f3d;border:1px solid #1e3a8a;color:#60a5fa',
+    green:  'background:#052e16;border:1px solid #166534;color:#4ade80',
+    yellow: 'background:#1c1200;border:1px solid #92400e;color:#fbbf24',
+    red:    'background:#1c0505;border:1px solid #7f1d1d;color:#f87171',
+  };
+  el.style.cssText = 'padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;' + (styles[type]||styles.idle);
+  el.textContent = txt;
+}
+
+// ─── Balance display ─────────────────────────────────────────────────────────
+function fmt(minor) {
+  return '$' + (minor/100).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+
+const balState = { c1Minor: 0, c2Minor: 0 };
+
+function updateBalance(label, data) {
+  const isC1  = label === 'customer1';
+  const balEl = document.getElementById(isC1 ? 'c1-bal' : 'c2-bal');
+  const cardEl= document.getElementById(isC1 ? 'card-c1' : 'card-c2');
+  const heldRow = document.getElementById(isC1 ? 'c1-held-row' : 'c2-held-row');
+  const heldEl  = document.getElementById(isC1 ? 'c1-held' : 'c2-held');
+  const dotEl   = document.getElementById(isC1 ? 'c1-dot' : 'c2-dot');
+  const trendEl = document.getElementById(isC1 ? 'c1-trend' : 'c2-trend');
+
+  const prev = isC1 ? balState.c1Minor : balState.c2Minor;
+  const cur  = data.availableBalanceMinor;
+  if (isC1) balState.c1Minor = cur; else balState.c2Minor = cur;
+
+  balEl.textContent = fmt(cur);
+
+  if (prev > 0 && cur !== prev) {
+    const diff = cur - prev;
+    const sign = diff > 0 ? '+' : '';
+    trendEl.innerHTML = `<span class="${diff>0?'trend-up':'trend-down'}">${diff>0?'↑':'↓'} ${sign}${fmt(Math.abs(diff))}</span>`;
+    balEl.className = diff > 0 ? 'bump-up' : 'bump-dn';
+    cardEl.classList.add(diff > 0 ? 'glow-g' : 'glow-r');
+    setTimeout(() => { balEl.className=''; cardEl.classList.remove('glow-g','glow-r'); }, 900);
+  }
+
+  if (data.heldBalanceMinor > 0) {
+    heldRow.style.display = 'block';
+    heldEl.textContent = fmt(data.heldBalanceMinor);
+    dotEl.style.cssText = 'width:7px;height:7px;border-radius:50%;background:#f59e0b';
+    dotEl.classList.add('blink');
+  } else {
+    heldRow.style.display = 'none';
+    dotEl.style.cssText = 'width:7px;height:7px;border-radius:50%;background:#10b981';
+    dotEl.classList.remove('blink');
+  }
+}
+
+async function refreshBalances(stepLabel) {
+  try {
+    const res  = await fetch('/dev/accounts');
+    const data = await res.json();
+    let c1m = 0, c2m = 0;
+    for (const a of data) {
+      if (a.label === 'customer1') { updateBalance('customer1', a); c1m = a.availableBalanceMinor; }
+      else                         { updateBalance('customer2', a); c2m = a.availableBalanceMinor; }
+    }
+    if (stepLabel) pushBalance(stepLabel, c1m, c2m);
+  } catch(e) { log('Balance refresh failed: ' + e.message, 'error'); }
+}
+
+// ─── Risk score animation ────────────────────────────────────────────────────
+function clearRisk() {
+  updateGauge(0);
+  document.getElementById('risk-badge').textContent = '—';
+  document.getElementById('risk-badge').style.cssText = 'padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;background:#111827;border:1px solid #1e293b;color:#475569';
+  document.getElementById('rules-list').innerHTML = '<div style="font-size:10px;color:#1e293b;font-style:italic">No rules fired yet</div>';
+}
+
+async function animateRiskScore(score, rules) {
+  clearRisk();
+  await pause(180);
+  let running = 0;
+  const rulesList = document.getElementById('rules-list');
+  rulesList.innerHTML = '';
+
+  for (const r of (rules || [])) {
+    const pts = r.points || 0;
+    running += pts;
+    await pause(320);
+
+    const ruleColor = running < 40 ? '#10b981' : running < 80 ? '#eab308' : '#ef4444';
+    const row = document.createElement('div');
+    row.className = 'slide-up';
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:6px';
+    row.innerHTML = `
+      <div style="display:flex;align-items:center;gap:5px;min-width:0">
+        <div style="width:5px;height:5px;border-radius:50%;background:${ruleColor};flex-shrink:0"></div>
+        <span style="font-size:10px;color:#64748b;truncate">${esc(r.code||r.description||'')}</span>
+      </div>
+      <span style="font-size:10px;font-weight:700;color:${ruleColor};flex-shrink:0">+${pts}</span>`;
+    rulesList.appendChild(row);
+    updateGauge(Math.min(running, 100));
+  }
+
+  const badge = document.getElementById('risk-badge');
+  const levels = {
+    LOW:    { bg:'#052e16', border:'#166534', color:'#4ade80' },
+    MEDIUM: { bg:'#1c1200', border:'#92400e', color:'#fbbf24' },
+    HIGH:   { bg:'#1c0505', border:'#7f1d1d', color:'#f87171' },
+  };
+  const lvl = score < 40 ? 'LOW' : score < 80 ? 'MEDIUM' : 'HIGH';
+  const c = levels[lvl];
+  badge.textContent = lvl;
+  badge.style.cssText = `padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;background:${c.bg};border:1px solid ${c.border};color:${c.color}`;
+}
+
+// ─── Transfer flow animation ─────────────────────────────────────────────────
+function setXferDetail(lines) {
+  document.getElementById('xfer-detail').innerHTML =
+    lines.map(l => `<div style="${l.style||'color:#475569'}">${esc(l.text)}</div>`).join('');
+}
+
+function showEscrowDrop(show) {
+  const el = document.getElementById('escrow-drop');
+  el.style.display = show ? 'flex' : 'none';
+}
+
+function updateEscrow(amountMinor, desc) {
+  document.getElementById('escrow-val').textContent = fmt(amountMinor);
+  const maxEscrow = 510000;
+  const pct = Math.min(amountMinor / maxEscrow * 100, 100);
+  document.getElementById('escrow-bar').style.width = pct + '%';
+  document.getElementById('escrow-desc').textContent = desc || 'No pending holds';
+  if (amountMinor > 0) {
+    document.getElementById('escrow-card').classList.add('glow-a');
+    setTimeout(() => document.getElementById('escrow-card').classList.remove('glow-a'), 1000);
+  }
+}
+
+async function animateFlow(amount, riskLevel, reverse) {
+  const track   = document.getElementById('flow-track');
+  const label   = document.getElementById('flow-label');
+  const nodeFrom= document.getElementById(reverse ? 'node-c2' : 'node-c1');
+  const nodeTo  = document.getElementById(reverse ? 'node-c1' : 'node-c2');
+
+  const colors = { LOW:'#10b981', MEDIUM:'#eab308', HIGH:'#ef4444', DEFAULT:'#6366f1' };
+  const col = colors[riskLevel] || colors.DEFAULT;
+  const dur = (0.9 / SPEED) + 's';
+
+  nodeFrom.style.borderColor = col;
+  nodeFrom.style.boxShadow = `0 0 12px ${col}55`;
+  nodeTo.style.borderColor = col;
+  label.textContent = amount;
+  label.style.color = col;
+  label.style.borderColor = col;
+  track.style.background = col + '44';
+
+  const dot = document.createElement('div');
+  dot.className = reverse ? 'dot-fly-rev' : 'dot-fly-fwd';
+  dot.style.cssText += `background:${col};box-shadow:0 0 8px ${col};--fly-dur:${dur}`;
+  track.appendChild(dot);
+
+  await pause(900);
+  dot.remove();
+
+  setTimeout(() => {
+    nodeFrom.style.borderColor = '';
+    nodeFrom.style.boxShadow = '';
+    nodeTo.style.borderColor = '';
+    label.style.color = '';
+    label.style.borderColor = '';
+    track.style.background = '';
+  }, 600);
+}
+
+// ─── Stats update ────────────────────────────────────────────────────────────
+function updateStats() {
+  document.getElementById('s-total').textContent = S.stats.total;
+  document.getElementById('s-low').textContent   = S.stats.low + ' LOW';
+  document.getElementById('s-med').textContent   = S.stats.medium + ' MED';
+  document.getElementById('s-high').textContent  = S.stats.high + ' HIGH';
+  document.getElementById('s-approved').textContent = S.stats.approved;
+  document.getElementById('s-rejected').textContent = S.stats.rejected;
+  document.getElementById('s-escrow-vol').textContent = fmt(S.escrowVolMinor);
+  document.getElementById('s-idem').textContent = S.idemSaves;
+  document.getElementById('cnt-calls').textContent   = S.apiCalls;
+  document.getElementById('cnt-unique').textContent  = S.uniqueTransfers;
+  document.getElementById('cnt-approved').textContent= S.stats.approved;
+  document.getElementById('cnt-rejected').textContent= S.stats.rejected;
+  document.getElementById('cnt-idem').textContent    = S.idemSaves;
+  document.getElementById('cnt-escrow').textContent  = fmt(S.escrowVolMinor);
+  updateDist();
+}
+
+// ─── API helpers ─────────────────────────────────────────────────────────────
+async function apiFetch(method, url, body, token) {
+  S.apiCalls++;
+  const opts = { method, headers: { 'Content-Type':'application/json', ...(token ? {'Authorization':'Bearer '+token} : {}) } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  return { ok:res.ok, status:res.status, data: await res.json().catch(()=>({})) };
+}
+
+async function getToken(user) {
+  const r = await apiFetch('GET', `/dev/token?user=${user}`);
+  if (!r.ok) throw new Error('Token fetch failed: ' + user);
+  return r.data.token;
+}
+
+async function runTransfer(srcId, dstId, amountMinor, idemKey, token) {
+  const res = await fetch('/api/transfers', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+token, 'Idempotency-Key':idemKey },
+    body: JSON.stringify({ sourceAccountId:srcId, destinationAccountId:dstId, amountMinor, currency:'USD' })
+  });
+  S.apiCalls++;
+  return res.json();
+}
+
+async function listPendingAlerts(token) {
+  const res = await fetch('/api/analyst/alerts?status=REVIEW_PENDING', { headers:{'Authorization':'Bearer '+token} });
+  S.apiCalls++;
+  return res.json();
+}
+
+async function doReview(alertId, action, token) {
+  const reason = action === 'approve' ? 'Verified with customer — legitimate transfer' : 'Unable to verify — pattern consistent with fraud';
+  const res = await fetch(`/api/analyst/alerts/${alertId}/${action}`, {
+    method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+    body: JSON.stringify({ reason })
+  });
+  S.apiCalls++;
+  return res.json();
+}
+
+function uuid() {
+  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));
+}
+
+// ─── MAIN DEMO ───────────────────────────────────────────────────────────────
+async function startDemo() {
+  if (S.running) return;
+  S.running = true;
+
+  // Reset state
+  Object.assign(S, { logCount:0, apiCalls:0, uniqueTransfers:0, idemSaves:0, escrowVolMinor:0, velocityMinor:0,
+    stats:{total:0,low:0,medium:0,high:0,approved:0,rejected:0}, scoreHistory:[], alerts:[] });
+  Object.assign(balState, { c1Minor:0, c2Minor:0 });
+  balanceChart.data.labels = ['Start']; balanceChart.data.datasets[0].data = []; balanceChart.data.datasets[1].data = []; balanceChart.update();
+  document.getElementById('log-stream').innerHTML = '';
+  document.getElementById('alert-feed').innerHTML = '<div style="font-size:10px;color:#1e293b;font-style:italic">Waiting for transfers…</div>';
+  clearRisk(); showEscrowDrop(false); updateEscrow(0, 'No pending holds'); updateVelocity(0); updateStats();
+  document.getElementById('burst-grid').style.display = 'none';
+  document.getElementById('burst-grid').innerHTML = '';
+  document.getElementById('burst-meta').style.display = 'none';
+  document.getElementById('narration-label').textContent = "What's Happening";
+  document.getElementById('narration').style.display = 'block';
+  STEPS.forEach(s => setStep(s.id, 'pending'));
+
+  const btn = document.getElementById('start-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Running…';
+  btn.style.background = '#1e293b';
+  btn.style.borderColor = '#334155';
+
+  try {
+    // ── STEP 1: Reset ──────────────────────────────────────────────────────
+    setStep('reset', 'running'); setStatus('RESETTING', 'blue'); litArch('acid');
+    narrate('Clearing database and re-seeding fresh demo accounts. Customer 1 starts with <strong style="color:#f1f5f9">$500,000</strong> and Customer 2 with <strong style="color:#f1f5f9">$100,000</strong>.');
+    log('POST /dev/reset', 'api');
+    await apiFetch('POST', '/dev/reset');
+    await refreshBalances('Start');
+    log('Reset complete — C1=$500k  C2=$100k', 'success');
+    setStep('reset', 'done');
+    await pause(600);
+
+    // ── STEP 2: Auth ───────────────────────────────────────────────────────
+    setStep('auth', 'running'); setStatus('AUTH', 'blue'); litArch('jwt');
+    narrate('Issuing <strong style="color:#f1f5f9">JWT tokens</strong> for 3 principals — two CUSTOMER-role tokens for initiating transfers, one ANALYST-role token for reviewing high-risk holds.');
+    log('Fetching JWT tokens…', 'info');
+    S.tokens.customer1 = await getToken('customer1');
+    S.tokens.customer2 = await getToken('customer2');
+    S.tokens.analyst   = await getToken('analyst');
+    const ctxRes = await fetch('/dev/demo-context'); S.ctx = await ctxRes.json(); S.apiCalls++;
+    const r = S.ctx.recommended;
+    log(`customer1 …${S.tokens.customer1.slice(-6)} [CUSTOMER]`, 'success');
+    log(`customer2 …${S.tokens.customer2.slice(-6)} [CUSTOMER]`, 'success');
+    log(`analyst   …${S.tokens.analyst.slice(-6)} [ANALYST]`, 'success');
+    setStep('auth', 'done');
+    await pause(500);
+
+    // ── STEP 3: LOW transfer ───────────────────────────────────────────────
+    setStep('low', 'running'); setStatus('LOW RISK', 'green'); litArch('risk');
+    narrate('<strong style="color:#4ade80">LOW risk</strong> — C1 sends $5.00 to a <em>known beneficiary</em>. Only ACCOUNT_AGE_UNDER_7_DAYS fires (+20). Score 20 → funds settle immediately (POSTED).');
+    log('─ Scenario 1: LOW-risk transfer ─', 'info');
+    const lowKey = uuid();
+    setXferDetail([
+      { text:'C1 → C2   $5.00', style:'color:#4ade80;font-weight:700' },
+      { text:'Idempotency-Key: ' + lowKey.slice(0,20)+'…', style:'color:#334155' },
+    ]);
+    await animateFlow('$5.00', 'LOW', false);
+
+    const lowResult = await runTransfer(r.customer1SourceAccountId, r.knownBeneficiaryDestinationAccountId, 500, lowKey, S.tokens.customer1);
+    S.uniqueTransfers++; S.stats.total++; S.stats.low++;
+    S.scoreHistory.push({ label:'LOW', score:lowResult.riskScore });
+    updateVelocity(500);
+    await animateRiskScore(lowResult.riskScore, lowResult.triggeredRules);
+    await refreshBalances('Low xfer');
+    setXferDetail([
+      { text:'Status: POSTED', style:'color:#4ade80;font-weight:700' },
+      { text:`Risk: ${lowResult.riskLevel}  Score: ${lowResult.riskScore}`, style:'color:#4ade80' },
+      { text:'Funds settled immediately — no escrow needed', style:'color:#334155' },
+    ]);
+    pushAlert('LOW', '$5.00', 'POSTED', 'C1→C2');
+    updateStats(); log(`POSTED  score=${lowResult.riskScore}  level=LOW`, 'success');
+    setStep('low', 'done'); await pause(800);
+
+    // ── STEP 4: MEDIUM transfer ────────────────────────────────────────────
+    setStep('medium', 'running'); setStatus('MEDIUM RISK', 'yellow'); litArch('risk');
+    narrate('<strong style="color:#fbbf24">MEDIUM risk</strong> — C2 sends $40.00 to C1 (NEW beneficiary). Three rules fire: NEW_BENEFICIARY (+25), ACCOUNT_AGE (+20), LOGIN_ANOMALY (+16). Score 61 → POSTED but AI narrative queued async via Ollama.');
+    log('─ Scenario 2: MEDIUM-risk transfer ─', 'info');
+    const medKey = uuid();
+    setXferDetail([
+      { text:'C2 → C1   $40.00', style:'color:#fbbf24;font-weight:700' },
+      { text:'NEW beneficiary + login anomaly detected', style:'color:#f59e0b' },
+    ]);
+    await animateFlow('$40.00', 'MEDIUM', true);
+
+    const medResult = await runTransfer(r.customer2SourceAccountId, r.newBeneficiaryDestinationAccountId, 4000, medKey, S.tokens.customer2);
+    S.uniqueTransfers++; S.stats.total++; S.stats.medium++;
+    S.scoreHistory.push({ label:'MED', score:medResult.riskScore });
+    updateVelocity(4000);
+    await animateRiskScore(medResult.riskScore, medResult.triggeredRules);
+    await refreshBalances('Med xfer');
+    setXferDetail([
+      { text:'Status: POSTED', style:'color:#fbbf24;font-weight:700' },
+      { text:`Risk: ${medResult.riskLevel}  Score: ${medResult.riskScore}`, style:'color:#fbbf24' },
+      { text:'Ollama async narrative queued', style:'color:#334155' },
+    ]);
+    pushAlert('MEDIUM', '$40.00', 'POSTED', 'C2→C1');
+    updateStats(); log(`POSTED  score=${medResult.riskScore}  level=MEDIUM`, 'success');
+    setStep('medium', 'done'); await pause(800);
+
+    // ── STEP 5: HIGH transfer #1 ───────────────────────────────────────────
+    setStep('high1', 'running'); setStatus('HIGH RISK', 'red'); litArch('escrow');
+    narrate('<strong style="color:#f87171">HIGH risk</strong> — C2 sends $5,100. Velocity ($40+$5,100=$5,140) breaches $5,000/hr threshold. All 4 rules fire. Score 91 → funds <strong style="color:#fbbf24">held in ESCROW</strong>, C1 NOT credited.');
+    log('─ Scenario 3: HIGH-risk → ESCROW ─', 'info');
+    const high1Key = uuid();
+    setXferDetail([
+      { text:'C2 → C1   $5,100.00', style:'color:#f87171;font-weight:700' },
+      { text:'Velocity $40+$5,100 = $5,140 > $5,000 threshold ⚠', style:'color:#f87171' },
+      { text:'Funds will be HELD in ESCROW', style:'color:#fbbf24;font-weight:600' },
+    ]);
+    await animateFlow('$5,100', 'HIGH', true);
+    showEscrowDrop(true);
+
+    const high1Result = await runTransfer(r.customer2SourceAccountId, r.newBeneficiaryDestinationAccountId, 510000, high1Key, S.tokens.customer2);
+    S.uniqueTransfers++; S.stats.total++; S.stats.high++;
+    S.escrowVolMinor += 510000;
+    S.scoreHistory.push({ label:'HIGH #1', score:high1Result.riskScore });
+    updateVelocity(510000);
+    await animateRiskScore(high1Result.riskScore, high1Result.triggeredRules);
+    await refreshBalances('High #1');
+    updateEscrow(510000, `Transfer ${(high1Result.transferId||'').slice(0,10)}… held`);
+    setXferDetail([
+      { text:'Status: PENDING_REVIEW', style:'color:#fbbf24;font-weight:700' },
+      { text:`Risk: ${high1Result.riskLevel}  Score: ${high1Result.riskScore}`, style:'color:#f87171' },
+      { text:'$5,100 in escrow — C1 balance NOT yet increased', style:'color:#f59e0b' },
+    ]);
+    pushAlert('HIGH', '$5,100.00', 'PENDING_REVIEW', 'Escrow');
+    updateStats(); log(`PENDING_REVIEW  score=${high1Result.riskScore}`, 'warn');
+    setStep('high1', 'done'); await pause(600);
+
+    // ── STEP 6: Approve ────────────────────────────────────────────────────
+    setStep('approve', 'running'); setStatus('APPROVING', 'green'); litArch('acid');
+    narrate('<strong style="color:#4ade80">Analyst APPROVES</strong> — the analyst verifies the transfer with the customer and marks it approved. The $5,100 escrow is released and atomically credited to C1\'s ledger.');
+    log('─ Scenario 4: Analyst review → APPROVE ─', 'info');
+
+    const alerts1 = await listPendingAlerts(S.tokens.analyst);
+    const alert1  = (alerts1 || []).find(a => a.transferId === high1Result.transferId);
+    log(`Found alert ${(alert1?.alertId||'').slice(0,14)}…`, 'data');
+    setXferDetail([{ text:'Analyst reviewing alert…', style:'color:#60a5fa' }]);
+
+    const approveRes = await doReview(alert1?.alertId, 'approve', S.tokens.analyst);
+    S.stats.approved++;
+    await refreshBalances('Approved');
+    showEscrowDrop(false); updateEscrow(0, 'No pending holds');
+    setXferDetail([
+      { text:'APPROVED — funds released to C1', style:'color:#4ade80;font-weight:700' },
+      { text:'$5,100.00 credited from escrow → C1 balance increased', style:'color:#4ade80' },
+    ]);
+    pushAlert('HIGH', '$5,100.00', 'APPROVED', '✓ C1 credited');
+    updateStats(); log('APPROVED — $5,100 released from escrow', 'success');
+    setStep('approve', 'done'); await pause(800);
+
+    // ── STEP 7: HIGH #2 + Reject ───────────────────────────────────────────
+    setStep('high2', 'running'); setStatus('HIGH RISK', 'red'); litArch('escrow');
+    narrate('<strong style="color:#f87171">Second HIGH + REJECT</strong> — another HIGH-risk transfer placed. This time the analyst cannot verify it and rejects. The $1,000 escrow is returned to C2 (source account). Net balance unchanged for C1.');
+    log('─ Scenario 5: HIGH-risk → REJECT ─', 'info');
+    const high2Key = uuid();
+    setXferDetail([
+      { text:'C2 → C1   $1,000.00', style:'color:#f87171;font-weight:700' },
+      { text:'Velocity still above threshold', style:'color:#f87171' },
+    ]);
+    await animateFlow('$1,000', 'HIGH', true);
+    showEscrowDrop(true);
+
+    const high2Result = await runTransfer(r.customer2SourceAccountId, r.newBeneficiaryDestinationAccountId, 100000, high2Key, S.tokens.customer2);
+    S.uniqueTransfers++; S.stats.total++; S.stats.high++;
+    S.escrowVolMinor += 100000;
+    S.scoreHistory.push({ label:'HIGH #2', score:high2Result.riskScore });
+    updateEscrow(100000, `Transfer ${(high2Result.transferId||'').slice(0,10)}… held`);
+    pushAlert('HIGH', '$1,000.00', 'PENDING_REVIEW', 'Escrow');
+    log(`PENDING_REVIEW  score=${high2Result.riskScore}`, 'warn');
+    await refreshBalances('High #2');
+
+    const alerts2 = await listPendingAlerts(S.tokens.analyst);
+    const alert2  = (alerts2 || []).find(a => a.transferId === high2Result.transferId);
+    const rejectRes = await doReview(alert2?.alertId, 'reject', S.tokens.analyst);
+    S.stats.rejected++;
+    await refreshBalances('Rejected');
+    showEscrowDrop(false); updateEscrow(0, 'No pending holds');
+    setXferDetail([
+      { text:'REJECTED — funds returned to C2', style:'color:#f87171;font-weight:700' },
+      { text:'$1,000.00 returned from escrow → C2 source refunded', style:'color:#f87171' },
+    ]);
+    pushAlert('HIGH', '$1,000.00', 'REJECTED', '↩ C2 refunded');
+    updateStats(); log('REJECTED — $1,000 returned to C2', 'error');
+    setStep('high2', 'done'); await pause(800);
+
+    // ── STEP 8: Idempotency ────────────────────────────────────────────────
+    setStep('idem', 'running'); setStatus('IDEMPOTENCY', 'blue'); litArch('redis');
+    narrate('<strong style="color:#a78bfa">Idempotency test</strong> — replaying the LOW transfer with the <em>exact same Idempotency-Key</em>. Redis deduplication intercepts the duplicate and returns the cached response without creating a new ledger entry.');
+    log('─ Scenario 6: Idempotency replay ─', 'info');
+    log(`Replaying with key: ${lowKey.slice(0,20)}…`, 'data');
+    setXferDetail([
+      { text:'⚡ Same Idempotency-Key as LOW #1', style:'color:#a78bfa;font-weight:700' },
+      { text:lowKey.slice(0,32)+'…', style:'color:#334155;font-size:9px' },
+      { text:'Expecting: same transferId, zero new ledger entries', style:'color:#475569' },
+    ]);
+    const idemResult = await runTransfer(r.customer1SourceAccountId, r.knownBeneficiaryDestinationAccountId, 500, lowKey, S.tokens.customer1);
+    const isDupe = idemResult.transferId === lowResult.transferId;
+    if (isDupe) {
+      S.idemSaves++;
+      log('Idempotency confirmed — same transferId returned', 'success');
+      log(idemResult.transferId.slice(0,30)+'… ← identical', 'data');
+      setXferDetail([
+        { text:'Idempotency confirmed', style:'color:#a78bfa;font-weight:700' },
+        { text:`transferId identical: ${(idemResult.transferId||'').slice(0,24)}…`, style:'color:#4ade80' },
+        { text:`${S.apiCalls} total API calls / ${S.uniqueTransfers} unique transfers`, style:'color:#334155' },
+      ]);
+    } else {
+      log('Different transferId — check Redis config', 'warn');
+    }
+    updateStats(); setStep('idem', 'done'); await pause(700);
+
+    // ── STEP 9: Concurrent Burst ───────────────────────────────────────────
+    setStep('burst', 'running'); setStatus('BURST×8', 'blue'); litArch('conc');
+    narrate('<strong style="color:#f1f5f9">Concurrent burst</strong> — firing <strong style="color:#60a5fa">8 transfers simultaneously</strong> via <code style="font-size:10px;color:#a78bfa">Promise.all()</code>. Every layer is exercised in parallel: PostgreSQL optimistic locking, Redis idempotency, risk engine, escrow logic. Watch them all resolve concurrently in the panel →');
+    log('─ Scenario 8: Concurrent burst (8 parallel) ─', 'info');
+    log('Firing 8 transfers simultaneously…', 'api');
+    await runBurst(r);
+    setStep('burst', 'done'); await pause(600);
+
+    // ── STEP 10: Metrics ────────────────────────────────────────────────────
+    setStep('metrics', 'running'); setStatus('METRICS', 'blue'); litArch('obs');
+    narrate('<strong style="color:#f1f5f9">Observability</strong> — pulling live Micrometer metrics from /actuator. All metric endpoints are ANALYST-role protected. Prometheus scrape also available at /actuator/prometheus.');
+    log('─ Scenario 7: Observability ─', 'info');
+    const metrics = [
+      '/actuator/metrics/transfer.creation.latency',
+      '/actuator/metrics/risk.level.count',
+      '/actuator/metrics/risk.evaluation.latency',
+    ];
+    for (const url of metrics) {
+      log('GET ' + url, 'api');
+      try {
+        const res  = await fetch(url, { headers:{'Authorization':'Bearer '+S.tokens.analyst} });
+        const data = await res.json(); S.apiCalls++;
+        const count = data.measurements?.find(x=>x.statistic==='COUNT')?.value;
+        const mean  = data.measurements?.find(x=>x.statistic==='MEAN')?.value;
+        const name = url.split('/').pop();
+        log(`  ${name}: count=${Math.round(count||0)}${mean!=null?' mean='+(mean*1000).toFixed(1)+'ms':''}`, 'data');
+      } catch(e) { log('  error: ' + e.message, 'warn'); }
+      await pause(180);
+    }
+    setStep('metrics', 'done'); await pause(400);
+
+    // ── DONE ───────────────────────────────────────────────────────────────
+    setStatus('COMPLETE', 'green'); litArchAll();
+    narrate(`<strong style="color:#f1f5f9">Demo complete.</strong> ${S.stats.total} transfers — ${S.stats.low} LOW · ${S.stats.medium} MEDIUM · ${S.stats.high} HIGH. ${S.stats.approved} approved · ${S.stats.rejected} rejected. ${fmt(S.escrowVolMinor)} total escrow volume. ${S.idemSaves} Redis deduplication${S.idemSaves!==1?'s':''}. ${S.apiCalls} total API calls.`);
+    log('═ Demo complete — all scenarios passed ═', 'success');
+
+  } catch(err) {
+    log('FATAL: ' + err.message, 'error');
+    setStatus('ERROR', 'red');
+    console.error(err);
+  } finally {
+    S.running = false;
+    btn.disabled = false;
+    btn.textContent = '↺ Run Again';
+    btn.style.background = 'linear-gradient(135deg,#1d4ed8,#2563eb)';
+    btn.style.borderColor = '#3b82f6';
+  }
+}
+
+// ─── Arch card highlight ────────────────────────────────────────────────────
+function litArch(id) {
+  document.querySelectorAll('.arch-chip').forEach(el => el.classList.remove('lit'));
+  const el = document.getElementById('arch-' + id);
+  if (el) el.classList.add('lit');
+}
+function litArchAll() {
+  document.querySelectorAll('.arch-chip').forEach(el => el.classList.add('lit'));
+}
+
+// ─── Burst step ─────────────────────────────────────────────────────────────
+async function runBurst(r) {
+  // Show burst inside the narration card
+  document.getElementById('narration').style.display = 'none';
+  document.getElementById('narration-label').textContent = 'Concurrent Burst — 8 Parallel Requests';
+  const meta = document.getElementById('burst-meta');
+  meta.style.display = 'flex';
+  const grid = document.getElementById('burst-grid');
+  grid.style.display = 'grid';
+  grid.innerHTML = '';
+
+  // 8 transfers: mix of amounts triggering LOW/MED/HIGH
+  const scenarios = [
+    { label:'#1', amount:200,   desc:'$2.00   C1→C2' },
+    { label:'#2', amount:1500,  desc:'$15.00  C1→C2' },
+    { label:'#3', amount:6000,  desc:'$60.00  C2→C1' },
+    { label:'#4', amount:50000, desc:'$500    C2→C1' },
+    { label:'#5', amount:300,   desc:'$3.00   C1→C2' },
+    { label:'#6', amount:8000,  desc:'$80.00  C2→C1' },
+    { label:'#7', amount:75000, desc:'$750    C1→C2' },
+    { label:'#8', amount:900,   desc:'$9.00   C2→C1' },
+  ];
+
+  // Create tiles
+  const tiles = scenarios.map((sc, i) => {
+    const tile = document.createElement('div');
+    tile.className = 'burst-tile resolving';
+    tile.id = 'burst-tile-' + i;
+    tile.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:9px;font-weight:700;color:#60a5fa">${sc.label}</span>
+        <span id="bt-status-${i}" style="font-size:8px;color:#334155" class="blink">PENDING</span>
+      </div>
+      <div style="font-size:10px;font-weight:600;color:#94a3b8;margin-top:2px">${sc.desc}</div>
+      <div style="display:flex;justify-content:space-between;margin-top:3px">
+        <span id="bt-risk-${i}"  style="font-size:9px;color:#334155">—</span>
+        <span id="bt-score-${i}" style="font-size:9px;font-weight:700;color:#334155">—</span>
+      </div>`;
+    grid.appendChild(tile);
+    return tile;
+  });
+
+  document.getElementById('burst-inflight').textContent = scenarios.length;
+  let done = 0, held = 0, err = 0;
+  const t0 = Date.now();
+
+  // Fire all 8 in parallel
+  await Promise.allSettled(scenarios.map(async (sc, i) => {
+    const token  = i % 2 === 0 ? S.tokens.customer1 : S.tokens.customer2;
+    const srcId  = i % 2 === 0 ? r.customer1SourceAccountId : r.customer2SourceAccountId;
+    const dstId  = i % 2 === 0 ? r.knownBeneficiaryDestinationAccountId : r.newBeneficiaryDestinationAccountId;
+    try {
+      const res = await runTransfer(srcId, dstId, sc.amount, uuid(), token);
+      const tile = tiles[i];
+      const level = res.riskLevel || 'LOW';
+      const isHeld = res.status === 'PENDING_REVIEW' || res.transferStatus === 'PENDING_REVIEW';
+
+      tile.className = 'burst-tile ' + (isHeld ? 'held' : 'posted');
+      document.getElementById('bt-status-' + i).className = '';
+      document.getElementById('bt-status-' + i).style.color = isHeld ? '#fbbf24' : '#10b981';
+      document.getElementById('bt-status-' + i).textContent = isHeld ? 'HELD' : 'POSTED';
+      document.getElementById('bt-risk-'  + i).textContent  = level;
+      document.getElementById('bt-risk-'  + i).style.color  = level==='HIGH'?'#f87171':level==='MEDIUM'?'#fbbf24':'#4ade80';
+      document.getElementById('bt-score-' + i).textContent  = res.riskScore ?? '?';
+      document.getElementById('bt-score-' + i).style.color  = '#94a3b8';
+
+      done++;
+      if (isHeld) { held++; S.stats.high++; S.escrowVolMinor += sc.amount; }
+      else if (level === 'MEDIUM') S.stats.medium++;
+      else S.stats.low++;
+      S.stats.total++;
+      S.uniqueTransfers++;
+
+      pushAlert(level, '$'+(sc.amount/100).toFixed(2), isHeld?'ESCROW':'POSTED', sc.label);
+    } catch(e) {
+      err++;
+      tiles[i].className = 'burst-tile failed';
+      document.getElementById('bt-status-' + i).textContent = 'ERR';
+      document.getElementById('bt-status-' + i).style.color = '#f87171';
+    }
+    document.getElementById('burst-inflight').textContent = Math.max(0, scenarios.length - done - err);
+    document.getElementById('burst-done').textContent = done;
+    document.getElementById('burst-held').textContent = held;
+    const elapsed = (Date.now() - t0) / 1000;
+    document.getElementById('burst-rps').textContent = (done / elapsed).toFixed(1);
+  }));
+
+  const totalMs = Date.now() - t0;
+  log(`Burst complete: ${done}/8 resolved in ${totalMs}ms  (${(done/(totalMs/1000)).toFixed(1)} req/s)  held=${held}`, 'success');
+  updateStats();
+  await refreshBalances('Post-burst');
+  // Restore narration card
+  document.getElementById('burst-grid').style.display = 'none';
+  document.getElementById('burst-meta').style.display = 'none';
+  document.getElementById('narration-label').textContent = "What's Happening";
+  document.getElementById('narration').style.display = 'block';
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+initCharts();
+document.getElementById('flow-track').style.setProperty('--fly-dur', '0.9s');
+</script>
+</body>
+</html>
