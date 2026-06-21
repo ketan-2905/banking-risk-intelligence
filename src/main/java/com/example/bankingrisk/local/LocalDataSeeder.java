@@ -47,7 +47,7 @@ class LocalDataSeeder implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (accountRepository.existsById(ACCOUNT_1_ID)) {
+        if (accountRepository.count() > 0) {
             log.info("Local seed data already present, skipping");
             return;
         }
@@ -55,7 +55,6 @@ class LocalDataSeeder implements ApplicationRunner {
         log.info("Inserting local synthetic seed data");
 
         Account account1 = new Account();
-        account1.setId(ACCOUNT_1_ID);
         account1.setOwnerUserId(USER_1_ID);
         account1.setAccountNumber("DEMO-ACC-0001");
         account1.setCurrency("USD");
@@ -64,17 +63,16 @@ class LocalDataSeeder implements ApplicationRunner {
         accountRepository.save(account1);
 
         Account account2 = new Account();
-        account2.setId(ACCOUNT_2_ID);
         account2.setOwnerUserId(USER_2_ID);
         account2.setAccountNumber("DEMO-ACC-0002");
         account2.setCurrency("USD");
         account2.setAvailableBalanceMinor(100_000_00L); // $100,000.00
         account2.setHeldBalanceMinor(0L);
-        accountRepository.save(account2);
+        Account savedAccount2 = accountRepository.save(account2);
 
         Beneficiary beneficiary = new Beneficiary();
         beneficiary.setOwnerUserId(USER_1_ID);
-        beneficiary.setDestinationAccountId(ACCOUNT_2_ID);
+        beneficiary.setDestinationAccountId(savedAccount2.getId());
         beneficiaryRepository.save(beneficiary);
 
         LoginAudit normalLogin = new LoginAudit();
